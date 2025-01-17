@@ -1,40 +1,170 @@
-use gtk4::{
-    Application, ApplicationWindow, Button, ComboBoxText, Entry, Label, MessageDialog, Orientation,
-    ScrolledWindow, TextView, Box as GtkBox,
-    prelude::*,
+use iced::widget::{
+    button, text_input, Button, Column, Container, Text, TextInput,
 };
-use gio::Settings;
-use std::{cell::RefCell, rc::Rc, path::Path};
+use iced_native::Event;
+use iced_native::subscription::events;
 use crate::config::{Config, Entry as ConfigEntry};
+use std::{env, path::Path};
 
-#[derive(Clone)]
+#[derive(Default)]
 pub struct Gui {
     entries: Vec<ConfigEntry>,
-    settings: Settings,
+    config_file_path: String,
+    game_name: text_input::State,
+    executable: text_input::State,
+    start_commands: text_input::State,
+    end_commands: text_input::State,
+    game_name_value: String,
+    executable_value: String,
+    start_commands_value: String,
+    end_commands_value: String,
+    save_button: button::State,
+    exit_button: button::State,
 }
 
-impl Gui {
-    pub fn new() -> Self {
-        let settings = Settings::new("com.example.process_monitor");
-        let config_file_path = settings
-        .value("config-file-path")
-        .get::<String>()
-        .unwrap_or("./config.toml".to_string());
+#[derive(Debug, Clone)]
+pub enum Message {
+    GameNameChanged(String),
+    ExecutableChanged(String),
+    StartCommandsChanged(String),
+    EndCommandsChanged(String),
+    Save,
+    Exit,
+    EventOccurred(Event),
+}
 
-    
-        let mut gui = Self {
-            entries: Vec::new(),
-            settings,
+impl Application for Gui {
+    type Executor = executor::Default;
+    type Message = Message;
+    type Flags = ();
+
+    fn new(_flags: ()) -> (Gui, Command<Message>) {
+        // Set GSETTINGS_SCHEMA_DIR to the current directory
+        env::set_var("GSETTINGS_SCHEMA_DIR", "./schemas/");
+
+        let settings = gio::Settings::new("com.example.process_monitor");
+        let config_file_path = settings
+            .value("config-file-path")
+            .get::<String>()
+            .unwrap_or("./config.toml".to_string());
+
+        let mut gui = Gui {
+            config_file_path,
+            ..Gui::default()
         };
 
         // Load config when GUI is created
-        gui.load_config(&config_file_path);
-        gui
+        gui.load_config();
+        (gui, Command::none())
     }
 
-    pub fn load_config(&mut self, config_file_path: &str) {
-        if Path::new(config_file_path).exists() {
-            match Config::load_from_file(config_file_path) {
+    fn title(&self) -> String {
+        String::from("GameMon Configuration")
+    }
+
+    fn update(&mut self, message: Message) -> Command<Message> {
+        match message {
+            Message::GameNameChanged(value) => {
+                self.game_name_value = value;
+            }
+            Message::ExecutableChanged(value) => {
+                self.executable_value = value;
+            }
+            Message::StartCommandsChanged(value) => {
+                self.start_commands_value = value;
+            }
+            Message::EndCommandsChanged(value) => {
+                self.end_commands_value = value;
+            }
+            Message::Save => {
+                if let Err(err) = self.validate_and_save_entry() {
+                    println!("Error: {}", err);
+                }
+            }
+            Message::Exit => {
+                self.save_config();
+                std::process::exit(0);
+            }
+            Message::EventOccurred(event) => {
+                if let Event::Window(iced_native::window::Event::CloseRequested) = event {
+                    self.save_config();
+                    std::process::exit(0);
+                }
+            }
+        }
+        Command::none()
+    }
+
+    fn view(&mut self) -> Element<Message> {
+        let game_name_input = TextInput::new(
+            &mut self.game_name,
+            "Game Name",
+            &self.game_name_value,
+            Message::GameNameChanged,
+        )
+        .padding(10)
+        .size(20);
+
+        let executable_input = TextInput::new(
+            &mut self.executable,
+            "Executable",
+            &self.executable_value,
+            Message::ExecutableChanged,
+        )
+        .padding(10)
+        .size(20);
+
+        let start_commands_input = TextInput::new(
+            &mut self.start_commands,
+            "Start Commands",
+            &self.start_commands_value,
+            Message::StartCommandsChanged,
+        )
+        .padding(10)
+        .size(20);
+
+        let end_commands_input = TextInput::new(
+            &mut self.end_commands,
+            "End Commands",
+            &self.end_commands_value,
+            Message::EndCommandsChanged,
+        )
+        .padding(10)
+        .size(20);
+
+        let save_button = Button::new(&mut self.save_button).label(Text::new("Save Entry"))
+            .on_press(Message::Save);
+
+        let exit_button = Button::new(&mut self.exit_button, Text::new("Exit"))
+            .on_press(Message::Exit);
+
+        let content = Column::new()
+            .padding(20)
+            .spacing(10)
+            .push(game_name_input)
+            .push(executable_input)
+            .push(start_commands_input)
+            .push(end_commands_input)
+            .push(save_button)
+            .push(exit_button);
+
+        Container::new(content)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .center_x()
+            .center_y()
+            .into()
+    }
+
+    fn subscription(&self) -> Subscription<Message> {
+        events().map(Message::EventOccurred)
+    }
+}
+
+impl Gui {
+    fn load_config(&mut self) {
+        if Path::new(&self.config_file_path).exists() {
+            match Config::load_from_file(&self.config_file_path) {
                 Ok(config) => {
                     self.entries = config.entries;
                     println!("Configuration loaded successfully.");
@@ -47,209 +177,54 @@ impl Gui {
             let new_config = Config {
                 entries: Vec::new(),
             };
-            match new_config.save_to_file(config_file_path) {
-                Ok(_) => println!("New config file created at {}", config_file_path),
+            match new_config.save_to_file(&self.config_file_path) {
+                Ok(_) => println!("New config file created at {}", self.config_file_path),
                 Err(e) => eprintln!("Failed to create config file: {}", e),
             }
         }
     }
 
-    pub fn save_config(&self, config_file_path: &str) {
+    fn save_config(&self) {
         let config = Config {
             entries: self.entries.clone(),
         };
 
-        match config.save_to_file(config_file_path) {
+        match config.save_to_file(&self.config_file_path) {
             Ok(_) => println!("Configuration saved successfully."),
             Err(e) => eprintln!("Failed to save config: {}", e),
         }
     }
 
-    pub fn show_gui(&self) {
-        let app = Application::new(Some("com.example.process_monitor"), Default::default());
-        let gui = Rc::new(RefCell::new(self.clone()));
-
-        app.connect_activate(move |app| {
-            let window = ApplicationWindow::new(app);
-            window.set_title(Some("GameMon Configuration"));
-            window.set_default_size(800, 600);
-
-            let outer_vbox = GtkBox::builder()
-                .orientation(Orientation::Vertical)
-                .spacing(10)
-                .build();
-
-            let hbox = GtkBox::builder()
-                .orientation(Orientation::Horizontal)
-                .spacing(10)
-                .build();
-
-            let labels_vbox = GtkBox::builder()
-                .orientation(Orientation::Vertical)
-                .spacing(5)
-                .build();
-
-            let entries_vbox = GtkBox::builder()
-                .orientation(Orientation::Vertical)
-                .spacing(5)
-                .build();
-
-            let game_name_label = Label::new(Some("Game Name:"));
-            let game_name_entry = Rc::new(RefCell::new(Entry::new()));
-            labels_vbox.append(&game_name_label);
-            entries_vbox.append(&*game_name_entry.borrow());
-
-            let executable_label = Label::new(Some("Executable:"));
-            let executable_entry = Entry::new();
-            labels_vbox.append(&executable_label);
-            entries_vbox.append(&executable_entry);
-
-            let start_commands_label = Label::new(Some("Start Commands:"));
-            let start_commands_view = TextView::new();
-            start_commands_view.set_height_request(150);
-            let start_commands_scrolled = ScrolledWindow::new();
-            start_commands_scrolled.set_child(Some(&start_commands_view));
-            labels_vbox.append(&start_commands_label);
-            entries_vbox.append(&start_commands_scrolled);
-
-            let end_commands_label = Label::new(Some("End Commands:"));
-            let end_commands_view = TextView::new();
-            end_commands_view.set_height_request(150);
-            let end_commands_scrolled = ScrolledWindow::new();
-            end_commands_scrolled.set_child(Some(&end_commands_view));
-            labels_vbox.append(&end_commands_label);
-            entries_vbox.append(&end_commands_scrolled);
-
-            hbox.append(&labels_vbox);
-            hbox.append(&entries_vbox);
-            outer_vbox.append(&hbox);
-
-            let combo_box_label = Label::new(Some("Choose Game:"));
-            outer_vbox.append(&combo_box_label);
-
-            let combo_box = ComboBoxText::new();
-            gui.borrow().refresh_combo_box(&combo_box);
-
-            outer_vbox.append(&combo_box);
-
-            let button_box = GtkBox::builder()
-                .orientation(Orientation::Horizontal)
-                .spacing(10)
-                .build();
-
-            let save_button = Button::with_label("Save Entry");
-            let window_clone = window.clone();
-            save_button.connect_clicked({
-                let gui_rc = Rc::clone(&gui);
-                let game_name_entry_clone = Rc::clone(&game_name_entry);
-                let executable_entry_clone = executable_entry.clone();
-                let start_commands_view_clone = start_commands_view.clone();
-                let end_commands_view_clone = end_commands_view.clone();
-                move |_| {
-                    if let Err(err) = Self::validate_and_save_entry(
-                        &gui_rc,
-                        &game_name_entry_clone,
-                        &executable_entry_clone,
-                        &start_commands_view_clone,
-                        &end_commands_view_clone,
-                    ) {
-                        let dialog = MessageDialog::builder()
-                            .modal(true)
-                            .transient_for(&window_clone)
-                            .buttons(gtk4::ButtonsType::Ok)
-                            .message_type(gtk4::MessageType::Error)
-                            .text("Invalid Input")
-                            .secondary_text(&err)
-                            .build();
-                        dialog.connect_response(|dialog, _| dialog.close());
-                        dialog.show();
-                    }
-                }
-            });
-
-            let exit_button = Button::with_label("Exit");
-            exit_button.connect_clicked({
-                let gui_rc = Rc::clone(&gui);
-                let app_clone = app.clone();
-                move |_| {
-                    let gui = gui_rc.borrow();
-                    let config_file_path = gui.settings
-                        .value("config-file-path")
-                        .get::<String>()
-                        .unwrap_or_else(|| "".to_string()
-                    );
-                    gui.save_config(&config_file_path);
-                    app_clone.quit();
-                }
-            });
-
-            button_box.append(&save_button);
-            button_box.append(&exit_button);
-            outer_vbox.append(&button_box);
-
-            window.set_child(Some(&outer_vbox));
-            window.show();
-        });
-
-        app.run();
-    }
-
-    fn validate_and_save_entry(
-        gui_rc: &Rc<RefCell<Self>>,
-        game_name_entry: &Rc<RefCell<Entry>>,
-        executable_entry: &Entry,
-        start_commands_view: &TextView,
-        end_commands_view: &TextView,
-    ) -> Result<(), String> {
-        let game_name = game_name_entry.borrow().text().to_string();
-        if game_name.trim().is_empty() {
+    fn validate_and_save_entry(&mut self) -> Result<(), String> {
+        if self.game_name_value.trim().is_empty() {
             return Err("Game name cannot be empty.".to_string());
         }
 
-        let executable = executable_entry.text().to_string();
-        if executable.trim().is_empty() {
+        if self.executable_value.trim().is_empty() {
             return Err("Executable cannot be empty.".to_string());
         }
 
-        let start_commands_text = start_commands_view.buffer().text(
-            &start_commands_view.buffer().start_iter(),
-            &start_commands_view.buffer().end_iter(),
-            false,
-        );
-        if start_commands_text.trim().is_empty() {
+        if self.start_commands_value.trim().is_empty() {
             return Err("Start commands cannot be empty.".to_string());
         }
 
-        let end_commands_text = end_commands_view.buffer().text(
-            &end_commands_view.buffer().start_iter(),
-            &end_commands_view.buffer().end_iter(),
-            false,
-        );
-        if end_commands_text.trim().is_empty() {
+        if self.end_commands_value.trim().is_empty() {
             return Err("End commands cannot be empty.".to_string());
         }
 
-        let mut gui = gui_rc.borrow_mut();
-        gui.entries.push(ConfigEntry {
-            game_name,
-            executable,
-            start_commands: start_commands_text
+        self.entries.push(ConfigEntry {
+            game_name: self.game_name_value.clone(),
+            executable: self.executable_value.clone(),
+            start_commands: self.start_commands_value
                 .lines()
                 .map(|line| line.trim().to_string())
                 .collect(),
-            end_commands: end_commands_text
+            end_commands: self.end_commands_value
                 .lines()
                 .map(|line| line.trim().to_string())
                 .collect(),
         });
 
         Ok(())
-    }
-
-    pub fn refresh_combo_box(&self, combo_box: &ComboBoxText) {
-        combo_box.remove_all();
-        for entry in &self.entries {
-            combo_box.append_text(&entry.game_name);
-        }
     }
 }

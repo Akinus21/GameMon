@@ -1,5 +1,5 @@
-use toml::{de, ser};
 use serde::{Serialize, Deserialize};
+use toml::ser;
 use std::fs;
 use std::error::Error;
 
@@ -31,7 +31,7 @@ impl Config {
     // Use TOML to load the configuration from a file
     pub fn load_from_file(file_path: &str) -> Result<Self, Box<dyn Error>> {
         let data = fs::read_to_string(file_path)?;
-        let config: Config = de::from_str(&data)?;
+        let config: Config = toml::from_str(&data)?;
         Ok(config)
     }
 

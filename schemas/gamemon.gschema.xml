@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="com.example.process_monitor" path="/com/example/process_monitor/">
+    <key name="config-file-path" type="s">
+      <default>"./config.toml"</default>
+      <summary>Path to the configuration file</summary>
+      <description>The file path to the configuration file used by the application.</description>
+    </key>
+  </schema>
+</schemalist>
