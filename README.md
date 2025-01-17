@@ -18,7 +18,7 @@ Gaming Monitor is a system tray application that monitors specific executables a
    ```
 3. Navigate to the project directory:
    ```
-   cd rust-system-tray-app
+   cd GameMon
    ```
 4. Build the project:
    ```
