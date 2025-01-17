@@ -1,0 +1,27 @@
+[package]
+name = "app"
+version = "0.1.0"
+description = "A Tauri App"
+authors = ["you"]
+license = ""
+repository = ""
+edition = "2021"
+rust-version = "1.77.2"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+sysinfo = "0.33.0"  # For process monitoring
+toml = "0.8.19"  # For config management
+system-tray = "0.6.0"  # For tray icon
+tokio = { version = "1", features = ["full"] }  # For async runtime
+eframe = "0.30.0" # For `egui` GUI
+futures = "0.3"
+gtk4 = "0.9.5"
+glib = "0.20.7"
+gio = "0.20.7"
+tray-icon = "0.19.2"
+image = "0.24"

@@ -1,0 +1,9 @@
+[[entries]]
+executable = "helldivers2.exe"
+start_commands = ["echo 'Game started'", "some_command_here"]
+end_commands = ["echo 'Game ended'", "another_command_here"]
+
+[[entries]]
+executable = "example.exe"
+start_commands = ["echo 'Example started'"]
+end_commands = ["echo 'Example ended'"]
