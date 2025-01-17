@@ -1,3 +1,6 @@
+use std::env;
+use std::process::exit;
+
 use gtk4 as gtk;
 use gtk::prelude::*;
 use gtk::Application;
@@ -17,6 +20,16 @@ mod util;
 // }
 
 fn main() {
+    // Initialize GTK
+    match util::initialize_gtk() {
+        Ok(_) => (),
+        Err(err) => {
+            eprintln!("{}", err);
+            exit(1);
+        }
+        
+    }
+
     Tray::new().spawn();  // Spawn the system tray icon
 
     if let Ok(event) = TrayIconEvent::receiver().try_recv() {
