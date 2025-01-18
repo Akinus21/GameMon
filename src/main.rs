@@ -1,5 +1,7 @@
 
-use std::env;
+use std::sync::mpsc;
+use std::thread;
+use std::time::Duration;
 
 mod gui;
 mod config;
@@ -7,23 +9,42 @@ mod tray;
 mod util;
 mod app;
  
-pub fn main(){
-    // Set the environment variables
-    env::set_var("DISPLAY", ":0");  // Adjust as needed for your system
-    env::set_var("DBUS_SESSION_BUS_ADDRESS", "unix:path=/run/user/1000/bus");  // Replace 1000 with your user ID
+pub fn main() {
+    // Create a channel for communication
+    let (tx, rx) = mpsc::channel();
 
-    match app::watchdog() {
-        Ok(_) => {
-            // Handle success (if needed)
-            println!("Watchdog started successfully.");
-        },
-        Err(e) => {
-            // Handle the error
-            eprintln!("Failed to start watchdog: {}", e);
-            // Optionally, you can exit the program or return a specific error code
-            std::process::exit(1);
+    // Spawn the watchdog function in its own thread
+    thread::spawn(move || {
+        let result = app::watchdog();
+        // Send the result back to the main thread
+        if let Err(e) = tx.send(result) {
+            eprintln!("Failed to send watchdog result to main thread: {}", e);
         }
+    });
+
+    loop {
+        match rx.try_recv() {
+            Ok(Ok(_)) => {
+                println!("Watchdog started successfully.");
+            }
+            Ok(Err(e)) => {
+                eprintln!("Watchdog encountered an error: {}", e);
+                break;
+            }
+            Err(mpsc::TryRecvError::Disconnected) => {
+                eprintln!("Watchdog thread disconnected. Exiting...");
+                break;
+            }
+            Err(mpsc::TryRecvError::Empty) => {
+                // No messages yet, continue running
+            }
+        }
+
+        // Keep the main thread alive with a sleep
+        thread::sleep(Duration::from_secs(1));
     }
+
+    println!("Main function exiting.");
 }
 
 #[test]

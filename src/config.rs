@@ -29,9 +29,11 @@ impl Default for Entry {
 
 impl Config {
     // Use TOML to load the configuration from a file
-    pub fn load_from_file(file_path: &str) -> Result<Self, Box<dyn Error>> {
-        let data = fs::read_to_string(file_path)?;
-        let config: Config = toml::from_str(&data)?;
+    pub fn load_from_file(file_path: &str) -> Result<Self, Box<dyn std::error::Error + Send>> {
+        let data = fs::read_to_string(file_path)
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?;
+        let config: Config = toml::from_str(&data)
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?;
         Ok(config)
     }
 
