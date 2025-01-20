@@ -3,7 +3,7 @@ use toml::ser;
 use std::fs;
 use std::error::Error;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Config {
     pub entries: Vec<Entry>,
 }

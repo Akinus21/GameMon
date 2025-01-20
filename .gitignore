@@ -7,3 +7,4 @@
 .vscode/
 /config.toml
 /build.rs
+/diagnostic.txt
