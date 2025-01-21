@@ -25,3 +25,8 @@ serde = { version = "1.0", features = ["derive"] }
 sysinfo = "0.33.1"
 notify-rust = "4.11.4"
 dashmap = "6.1.0"
+gtk = "0.18.2"
+gtk4 = "0.9.5"
+pango = "0.20.7"
+gdk-pixbuf = "0.20.7"
+atk = "0.18.2"

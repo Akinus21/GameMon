@@ -19,14 +19,16 @@ use iced::widget::{
     horizontal_space,
 };
 use iced::Length::Fill;
-use iced::{application, Element, theme};
+use iced::{application, theme, Element, Theme};
 use crate::config::{Config, Entry};
 
 pub fn show_gui() -> iced::Result {
-    iced::run("A cool counter", Gui::update, Gui::view)
+    // Start the GUI application
+    iced::application("GameMon", Gui::update, Gui::view).theme(Gui::theme).run()
+    // iced::run("GameMon", Gui::update, Gui::view)
 }
 
-#[derive(Default)]
+// #[derive(Default)]
 struct Gui {
     game_name_field: String,      // List of game names
     selected_game_name: Option<String>, // Currently selected game name
@@ -39,6 +41,44 @@ struct Gui {
     game_start_commands: Vec<String>,
     game_end_commands: Vec<String>,
     game_names: Vec<String>,
+    entry_changed: bool,
+}
+
+impl Default for Gui{
+    fn default() -> Self {
+        let game_entries = Config::load_from_file(&*Config::get_config_path().unwrap()).unwrap().entries;
+        let mut game_executables = Vec::new();
+        let mut game_start_commands = Vec::new();
+        let mut game_end_commands = Vec::new();
+        let mut game_names = Vec::new();
+
+        for entry in game_entries.clone() {
+            game_names.push(entry.game_name.clone());
+            game_executables.push(entry.executable.clone());
+            game_start_commands.push(
+                entry.start_commands.join("\n").trim_ascii_end().to_string()  // Join with newlines
+            );
+            
+            game_end_commands.push(
+                entry.end_commands.join("\n").trim_ascii_end().to_string()      // Join with newlines
+            );
+        }
+
+        Self {
+            game_name_field: "Enter game name...".to_string(),
+            selected_game_name: None,
+            selected_game_entry: None,
+            game_executable_field: "Enter game executable...".to_string(),
+            start_commands_field: text_editor::Content::with_text("Enter start commands..."),
+            end_commands_field: text_editor::Content::with_text("Enter end commands..."),
+            game_entries: game_entries,
+            game_executables: game_executables,
+            game_start_commands: game_start_commands,
+            game_end_commands: game_end_commands,
+            game_names: game_names,
+            entry_changed: false,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -55,27 +95,35 @@ enum Message {
 }
 
 impl Gui {
+    fn theme(&self) -> Theme {
+        Theme::Dracula
+    }
     fn update(&mut self, message: Message) {
+        
         match message {
             Message::GameNameChanged(content) => {
                 self.game_name_field = content.clone();
+                self.entry_changed = true;
                 // println!("Game Name changed: {}", content);
             }
             Message::GameExectuableChanged(content) => {
                 self.game_executable_field = content.clone();
+                self.entry_changed = true;
                 // println!("Game Executable changed: {}", content);
             }
             Message::StartCommandsChanged(action) => {
                 self.start_commands_field.perform(action);
+                self.entry_changed = true;
             }
             Message::EndCommandsChanged(action) => {
                 self.end_commands_field.perform(action);
+                self.entry_changed = true;
             }
             Message::GameSelected(game_name) => {
                 self.selected_game_name = Some(game_name.clone());
                 
                 // Save the current entry before switching if the game name field is not empty
-                if !self.game_name_field.is_empty() {
+                if self.entry_changed {
                     self.save_current_entry();
                 }
                 
@@ -87,13 +135,18 @@ impl Gui {
                 self.game_executable_field = selected_entry.executable.clone();
                 self.start_commands_field = text_editor::Content::with_text(&selected_entry.start_commands.join("\n"));
                 self.end_commands_field = text_editor::Content::with_text(&selected_entry.end_commands.join("\n"));
+                self.entry_changed = false;
                 // println!("Game selected: {}", game_name);
             }
             Message::NewEntry => {
+                if self.entry_changed {
+                    self.save_current_entry();
+                }
                 self.game_name_field = "Enter game name...".to_string();
                 self.game_executable_field = "Enter game executable...".to_string();
                 self.start_commands_field = text_editor::Content::with_text("Enter start commands...");
                 self.end_commands_field = text_editor::Content::with_text("Enter end commands...");
+                self.entry_changed = false;
                 // println!("New entry button clicked");
             }
             Message::SaveEntry => {
@@ -128,8 +181,7 @@ impl Gui {
                 }
             }
             Message::ViewLoading => {
-                println!("View loading");
-
+                
                 let config_path = &*Config::get_config_path().unwrap();
                 let config = match Config::load_from_file(config_path) {
                     Ok(config) => config,
@@ -142,7 +194,7 @@ impl Gui {
     }
 
     fn view(&self) -> Row<Message> {
-     
+    
         // Define placeholders for the text editors
         // let start_commands_placeholder = self.game_start_commands[0].to_string();
         // let end_commands_placeholder = self.game_end_commands[0].to_string();
@@ -156,7 +208,8 @@ impl Gui {
                     self.selected_game_name.clone(),
                     Message::GameSelected,
                 )
-                .placeholder("Select a game..."),
+                .placeholder("Select a game...")
+                .on_open(Message::ViewLoading),
 
                 // Vertical space
                 container("").height(Fill),
@@ -168,19 +221,22 @@ impl Gui {
         .padding(10)
         .align_x(Left);
 
-        //definte right container
+        //define right container
         let right_container = container(
             column![
 
                 row![
                     // Game Name label and field
-                    text("Game Name:").align_x(Left).size(16).align_y(yCenter),
-
+                    column![
+                        vertical_space().height(10),
+                        text("Game Name:").align_x(Left).size(16).align_y(Bottom),
+                    ],
+                    
                     horizontal_space().width(10),
 
                     text_input(
                         // &self.game_names[0].clone(),
-                        "Enter game name...",
+                        "Game name...",
                         &self.game_name_field,
                     )
                     .padding(10)
@@ -191,13 +247,16 @@ impl Gui {
                     horizontal_space().width(10),
 
                     // Game Executable label and field
-                    text("Game Executable:").align_x(Left).size(16).align_y(yCenter),
-                    
+                    column![
+                        vertical_space().height(10),
+                        text("Game Executable:").align_x(Left).size(16).align_y(Bottom),
+                    ],
+
                     horizontal_space().width(10),
                     
                     text_input(
                         // &self.game_executables[0].clone(),
-                        "Enter game executable...",
+                        "Game executable...",
                         &self.game_executable_field,
                     ).padding(10)
                     .size(16)
@@ -284,11 +343,11 @@ impl Gui {
             self.game_names.push(entry.game_name.clone());
             self.game_executables.push(entry.executable.clone());
             self.game_start_commands.push(
-                entry.start_commands.join("\n").trim_end().to_string()  // Join with newlines
+                entry.start_commands.join("\n").trim_ascii_end().to_string()  // Join with newlines
             );
             
             self.game_end_commands.push(
-                entry.end_commands.join("\n").trim_end().to_string()         // Join with newlines
+                entry.end_commands.join("\n").trim_ascii_end().to_string()      // Join with newlines
             );
         }
     }
@@ -328,6 +387,7 @@ impl Gui {
             Config::save_to_file(&new_config.clone(), &*Config::get_config_path().unwrap()).unwrap();
         
         }
+        self.entry_changed = false;
     }
 }
 

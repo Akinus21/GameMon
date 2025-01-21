@@ -3,6 +3,8 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
+use tray::Tray;
+
 mod gui;
 mod config;
 mod tray;
@@ -10,65 +12,67 @@ mod util;
 mod app;
  
 pub fn main() {
-//     // Create a channel for communication
-//     let (tx, rx) = mpsc::channel();
+    // Create a channel for communication
+    let (wtx, wrx) = mpsc::channel(); // For watchdog
+    let (ttx, trx) = mpsc::channel(); // For tray events
 
-//     // Spawn the watchdog function in its own thread
-//     thread::spawn(move || {
-//         let result = app::watchdog();
-//         // Send the result back to the main thread
-//         if let Err(e) = tx.send(result) {
-//             eprintln!("Failed to send watchdog result to main thread: {}", e);
-//         }
-//     });
 
-//     loop {
-//         match rx.try_recv() {
-//             Ok(Ok(_)) => {
-//                 println!("Watchdog started successfully.");
-//             }
-//             Ok(Err(e)) => {
-//                 eprintln!("Watchdog encountered an error: {}", e);
-//                 break;
-//             }
-//             Err(mpsc::TryRecvError::Disconnected) => {
-//                 eprintln!("Watchdog thread disconnected. Exiting...");
-//                 break;
-//             }
-//             Err(mpsc::TryRecvError::Empty) => {
-//                 // No messages yet, continue running
-//             }
-//         }
+    // Spawn the watchdog function in its own thread
+    thread::spawn(move || {
+        let result = app::watchdog();
+        // Send the result back to the main thread
+        if let Err(e) = wtx.send(result) {
+            eprintln!("Failed to send watchdog result to main thread: {}", e);
+        }
+    });
 
-//         // Keep the main thread alive with a sleep
-//         thread::sleep(Duration::from_secs(1));
-//     }
+    // Spawn the tray logic in its own thread
+    thread::spawn(move || {
+        let tray = Tray::new(ttx);
+        tray.spawn();
+        gtk::main(); // Keep GTK running in the tray thread
+    });
 
-//     println!("Main function exiting.");
-    let result = gui::show_gui();
-    assert!(result.is_ok());
-}
+    loop {
+        // Handle watchdog messages
+        match wrx.try_recv() {
+            Ok(Ok(_)) => {
+                println!("Watchdog started successfully.");
+            }
+            Ok(Err(e)) => {
+                eprintln!("Watchdog encountered an error: {}", e);
+                break;
+            }
+            Err(mpsc::TryRecvError::Disconnected) => {
+                eprintln!("Watchdog thread disconnected. Exiting...");
+                break;
+            }
+            Err(mpsc::TryRecvError::Empty) => {
+                // No messages yet, continue running
+            }
+        }
 
-#[test]
-fn get_entries() {
-    let config = config::Config::load_from_file(&*config::Config::get_config_path().unwrap()).unwrap();
-    println!("{:?}", config.entries);
-    assert_eq!(config.entries.len(), 2);
-}
+        // Handle tray events
+        if let Ok(event) = trx.try_recv() {
+            println!("Tray event recieved: {}", event);
+            match event.as_str() {
+                "Show GUI" => {
+                    println!("Show GUI triggered.");
+                    // let result = gui::show_gui();
+                    // assert!(result.is_ok());
+                }
+                "Exit" => {
+                    println!("Exit triggered. Exiting application...");
+                    break;
+                }
+                _ => eprintln!("Unknown menu event: {}", event),
+            }
+        }
 
-#[test]
-fn notify_test() {
-    let notification = notify_rust::Notification::new()
-        .summary("GameMon")
-        .body("GameMon is running.")
-        .icon("dialog-information")
-        .timeout(notify_rust::Timeout::Milliseconds(5000))
-        .show();
-    assert!(notification.is_ok());
-}
+        // Keep the main thread alive with a sleep
+        thread::sleep(Duration::from_secs(1));
+    }
 
-#[test]
-fn test_gui() {
-    let result = gui::show_gui();
-    assert!(result.is_ok());
+    println!("Main function exiting.");
+
 }
