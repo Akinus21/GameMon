@@ -19,13 +19,11 @@ use iced::widget::{
     horizontal_space,
 };
 use iced::Length::Fill;
-use iced::{application, Element};
+use iced::{application, Element, theme};
 use crate::config::{Config, Entry};
 
 pub fn show_gui() -> iced::Result {
-    iced::application("GameMon", Gui::update, Gui::view)
-        .run_with(|| Gui::new(()))
-    // iced::run("A cool counter", Gui::update, Gui::view)
+    iced::run("A cool counter", Gui::update, Gui::view)
 }
 
 #[derive(Default)]
@@ -54,27 +52,18 @@ enum Message {
     NewEntry,
     SaveEntry,
     RemoveEntry,
-    SaveConfig,
-    Exit,
 }
 
 impl Gui {
-    fn new(_flags: ()) -> (Gui, iced::Task<Message>) {
-        (
-            Gui::default(),
-            iced::Task::perform(async { Message::ViewLoading }, |_| Message::ViewLoading),
-        )
-    }
-
     fn update(&mut self, message: Message) {
         match message {
             Message::GameNameChanged(content) => {
                 self.game_name_field = content.clone();
-                println!("Game Name changed: {}", content);
+                // println!("Game Name changed: {}", content);
             }
             Message::GameExectuableChanged(content) => {
                 self.game_executable_field = content.clone();
-                println!("Game Executable changed: {}", content);
+                // println!("Game Executable changed: {}", content);
             }
             Message::StartCommandsChanged(action) => {
                 self.start_commands_field.perform(action);
@@ -85,6 +74,11 @@ impl Gui {
             Message::GameSelected(game_name) => {
                 self.selected_game_name = Some(game_name.clone());
                 
+                // Save the current entry before switching if the game name field is not empty
+                if !self.game_name_field.is_empty() {
+                    self.save_current_entry();
+                }
+                
                 let entries = Config::load_from_file(&*Config::get_config_path().unwrap()).unwrap().entries;
                 let selected_entry = entries.iter().find(|entry| entry.game_name == game_name).unwrap();
                 self.selected_game_entry = Some(selected_entry.clone());
@@ -93,52 +87,19 @@ impl Gui {
                 self.game_executable_field = selected_entry.executable.clone();
                 self.start_commands_field = text_editor::Content::with_text(&selected_entry.start_commands.join("\n"));
                 self.end_commands_field = text_editor::Content::with_text(&selected_entry.end_commands.join("\n"));
-                println!("Game selected: {}", game_name);
+                // println!("Game selected: {}", game_name);
             }
             Message::NewEntry => {
                 self.game_name_field = "Enter game name...".to_string();
                 self.game_executable_field = "Enter game executable...".to_string();
                 self.start_commands_field = text_editor::Content::with_text("Enter start commands...");
                 self.end_commands_field = text_editor::Content::with_text("Enter end commands...");
-                println!("New entry button clicked");
+                // println!("New entry button clicked");
             }
             Message::SaveEntry => {
-                println!("Save entry button clicked");
+                // println!("Save entry button clicked");
 
-                let mut entries = Config::load_from_file(&*Config::get_config_path().unwrap()).unwrap().entries;
-                if let Some(index) = entries.iter().position(|entry| entry.game_name == self.game_name_field){
-                    
-                    println!("Entry already exists at index {}", index);
-
-                    entries[index].game_name = self.game_name_field.clone();
-                    entries[index].executable = self.game_executable_field.clone();
-                    entries[index].start_commands = self.start_commands_field.text().split("\n").map(|s| s.to_string()).collect();
-                    entries[index].end_commands = self.end_commands_field.text().split("\n").map(|s| s.to_string()).collect();
-
-                    self.game_entries = entries.clone();
-                    let new_config = Config { entries: entries.clone() };
-                    self.refresh_stored_config(new_config.clone());
-                    Config::save_to_file(&new_config.clone(), &*Config::get_config_path().unwrap()).unwrap();
-                
-
-                } else {
-                    
-                    println!("Entry does not exist");
-
-                    let new_entry = Entry {
-                        game_name: self.game_name_field.clone(),
-                        executable: self.game_executable_field.clone(),
-                        start_commands: self.start_commands_field.text().split("\n").map(|s| s.to_string()).collect(),
-                        end_commands: self.end_commands_field.text().split("\n").map(|s| s.to_string()).collect(),
-                    };
-
-                    entries.push(new_entry);
-                    self.game_entries = entries.clone();
-                    let new_config = Config { entries: entries.clone() };
-                    self.refresh_stored_config(new_config.clone());
-                    Config::save_to_file(&new_config.clone(), &*Config::get_config_path().unwrap()).unwrap();
-                
-                }
+                self.save_current_entry();
 
             }
             Message::RemoveEntry => {
@@ -165,12 +126,6 @@ impl Gui {
                 } else {
                     println!("Entry does not exist");
                 }
-            }
-            Message::SaveConfig => {
-                println!("Save config button clicked");
-            }
-            Message::Exit => {
-                println!("Exit button clicked");
             }
             Message::ViewLoading => {
                 println!("View loading");
@@ -206,22 +161,6 @@ impl Gui {
                 // Vertical space
                 container("").height(Fill),
 
-                row![
-                    // new entry button
-                    button("New Entry")
-                        .on_press(Message::NewEntry)
-                        .padding(10),
-
-                    // Horizontal space
-                    horizontal_space().width(10),
-
-                    // remove entry button
-                    button("Remove Entry")
-                        .on_press(Message::RemoveEntry)
-                        .padding(10),
-                    
-                ]
-
             ]
             .padding(20)
             .align_x(xCenter)
@@ -235,7 +174,7 @@ impl Gui {
 
                 row![
                     // Game Name label and field
-                    text("Game Name:").align_x(Left).size(20),
+                    text("Game Name:").align_x(Left).size(16).align_y(yCenter),
 
                     horizontal_space().width(10),
 
@@ -245,14 +184,14 @@ impl Gui {
                         &self.game_name_field,
                     )
                     .padding(10)
-                    .size(20)
+                    .size(16)
                     .on_input(Message::GameNameChanged),
                     
                     // Horizontal space
                     horizontal_space().width(10),
 
                     // Game Executable label and field
-                    text("Game Executable:").align_x(Left).size(20),
+                    text("Game Executable:").align_x(Left).size(16).align_y(yCenter),
                     
                     horizontal_space().width(10),
                     
@@ -261,7 +200,7 @@ impl Gui {
                         "Enter game executable...",
                         &self.game_executable_field,
                     ).padding(10)
-                    .size(20)
+                    .size(16)
                     .on_input(Message::GameExectuableChanged),
 
                     horizontal_space().width(10),
@@ -275,7 +214,8 @@ impl Gui {
                 text_editor(&self.start_commands_field)
                     // .placeholder(start_commands_placeholder)
                     .placeholder("Start commands...")
-                    .on_action(Message::StartCommandsChanged),
+                    .on_action(Message::StartCommandsChanged)
+                    .size(14),
 
                 // Vertical space
                 vertical_space().height(10),
@@ -285,32 +225,34 @@ impl Gui {
                 text_editor(&self.end_commands_field)
                     // .placeholder(end_commands_placeholder)
                     .placeholder("End commands...")
-                    .on_action(Message::EndCommandsChanged),
+                    .on_action(Message::EndCommandsChanged)
+                    .size(14),
 
                 // Vertical space
                 vertical_space().height(Fill),
 
                 row![
+                    // new entry button
+                    button("New Entry")
+                        .on_press(Message::NewEntry)
+                        .padding(10),
+
+                    // Horizontal space
+                    horizontal_space().width(10),
+
+                    // remove entry button
+                    button("Remove Entry")
+                        .on_press(Message::RemoveEntry)
+                        .padding(10),
+
+                    // Horizontal space
+                    horizontal_space().width(10),
+
                     // Save Entry button
                     button("Save Entry")
                         .on_press(Message::SaveEntry)
                         .padding(10),
-
-                    // Horizontal space
-                    horizontal_space().width(10),
-
-                    // Save Config button
-                    button("Save Config")
-                        .on_press(Message::SaveConfig)
-                        .padding(10),
                     
-                    // Horizontal space
-                    horizontal_space().width(10),
-
-                    // Exit button
-                    button("Exit")
-                        .on_press(Message::Exit)
-                        .padding(10),
                 ]
                 
 
@@ -342,22 +284,49 @@ impl Gui {
             self.game_names.push(entry.game_name.clone());
             self.game_executables.push(entry.executable.clone());
             self.game_start_commands.push(
-                entry.start_commands
-                    .iter()
-                    .filter(|cmd| !cmd.is_empty()) // Filter out empty strings
-                    .cloned()
-                    .collect::<Vec<_>>() // Collect into a vector
-                    .join("\n"),         // Join with newlines
+                entry.start_commands.join("\n").trim_end().to_string()  // Join with newlines
             );
             
             self.game_end_commands.push(
-                entry.end_commands
-                    .iter()
-                    .filter(|cmd| !cmd.is_empty()) // Filter out empty strings
-                    .cloned()
-                    .collect::<Vec<_>>() // Collect into a vector
-                    .join("\n"),         // Join with newlines
+                entry.end_commands.join("\n").trim_end().to_string()         // Join with newlines
             );
+        }
+    }
+
+    fn save_current_entry(&mut self) {
+        let mut entries = Config::load_from_file(&*Config::get_config_path().unwrap()).unwrap().entries;
+        if let Some(index) = entries.iter().position(|entry| entry.game_name == self.game_name_field){
+            
+            println!("Entry already exists at index {}", index);
+
+            entries[index].game_name = self.game_name_field.clone();
+            entries[index].executable = self.game_executable_field.clone();
+            entries[index].start_commands = self.start_commands_field.text().split("\n").map(|s| s.to_string()).collect();
+            entries[index].end_commands = self.end_commands_field.text().split("\n").map(|s| s.to_string()).collect();
+
+            self.game_entries = entries.clone();
+            let new_config = Config { entries: entries.clone() };
+            self.refresh_stored_config(new_config.clone());
+            Config::save_to_file(&new_config.clone(), &*Config::get_config_path().unwrap()).unwrap();
+        
+
+        } else {
+            
+            println!("Entry does not exist");
+
+            let new_entry = Entry {
+                game_name: self.game_name_field.clone(),
+                executable: self.game_executable_field.clone(),
+                start_commands: self.start_commands_field.text().split("\n").map(|s| s.to_string()).collect(),
+                end_commands: self.end_commands_field.text().split("\n").map(|s| s.to_string()).collect(),
+            };
+
+            entries.push(new_entry);
+            self.game_entries = entries.clone();
+            let new_config = Config { entries: entries.clone() };
+            self.refresh_stored_config(new_config.clone());
+            Config::save_to_file(&new_config.clone(), &*Config::get_config_path().unwrap()).unwrap();
+        
         }
     }
 }
