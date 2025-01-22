@@ -1,6 +1,6 @@
 [package]
 name = "GameMon"
-version = "0.1.0"
+version = "0.1.1"
 description = "Gaming Monitor"
 authors = ["you"]
 license = ""
@@ -31,3 +31,4 @@ pango = "0.20.7"
 gdk-pixbuf = "0.20.7"
 atk = "0.18.2"
 dirs = "6.0.0"
+self_update = "0.42.0"

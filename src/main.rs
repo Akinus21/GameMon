@@ -1,4 +1,5 @@
 
+use std::path::PathBuf;
 use std::sync::mpsc;
 use std::{env, fs, thread};
 use std::time::Duration;
@@ -38,6 +39,36 @@ pub fn main() {
     } else if cfg!(target_os = "windows") {
         println!("Running on Windows");
         // Windows-specific actions
+
+        // Get the %APPDATA% directory
+        let appdata = env::var("APPDATA").unwrap_or_else(|_| {
+            eprintln!("Failed to get APPDATA environment variable. Using default path.");
+            String::from("C:\\Users\\Default\\AppData\\Roaming")
+        });
+
+        let dir_path = dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from(appdata))
+        .join("gamemon");
+
+        // Check if the directory exists
+        if !dir_path.exists() {
+            println!("Configuration directory does not exist. Creating it...");
+            if let Err(e) = fs::create_dir_all(&dir_path) {
+                eprintln!("Failed to create directory: {}", e);
+            } else {
+                println!("Directory created at {:?}", dir_path);
+            }
+        } else {
+            println!("Directory already exists at {:?}", dir_path);
+        }
+
+        // Set the working directory to the new path
+        if let Err(e) = env::set_current_dir(&dir_path) {
+            eprintln!("Failed to change directory: {}", e);
+        } else {
+            println!("Current directory changed to {:?}", dir_path);
+        }
+
     } else if cfg!(target_os = "macos") {
         println!("Running on macOS");
         // macOS-specific actions
