@@ -23,18 +23,14 @@ pub fn watchdog() -> Result<(), Box<dyn std::error::Error + Send>> {
     let refresh_kind = RefreshKind::everything();
     let mut sys = System::new_with_specifics(refresh_kind);
     
-    // Check for updates
-    let mut _update = util::update();
-    
-    // Set the update timer
-    let mut update_timer = 0;
+// Set the update timer (Starts at max to ensure check on first run.)
+    let mut update_timer = 60;
 
     loop {
         // Check for updates
         if update_timer >= 60 {
             // Check for updates every 60 seconds
-            println!("Checking for updates");
-            _update = util::update();
+            let _u = util::update();
             update_timer = 0;
         }
 

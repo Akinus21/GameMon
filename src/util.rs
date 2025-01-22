@@ -30,12 +30,14 @@ impl CustomIcon {
 }
 
 pub fn update() -> Result<(), Box<dyn Error>> {
+    println!("Checking for updates");
     // Configure and initiate the update process
     let status = Update::configure()
         .repo_owner("Akinus21") // Replace with your GitHub username
         .repo_name("GameMon")  // Replace with your GitHub repo name
         .bin_name("GameMon")   // The name of your executable
         .show_download_progress(true)
+        .current_version(cargo_crate_version!())
         .build()?
         .update()?;
 
