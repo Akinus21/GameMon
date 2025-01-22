@@ -1,8 +1,8 @@
 [package]
 name = "GameMon"
-version = "0.1.1"
+version = "0.2.0"
 description = "Gaming Monitor"
-authors = ["you"]
+authors = ["Akinus21"]
 license = ""
 repository = ""
 edition = "2021"

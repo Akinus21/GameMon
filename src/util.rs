@@ -1,6 +1,7 @@
 use std::env;
 use image::ImageReader;
 use self_update::cargo_crate_version;
+use notify_rust::Notification;
 
 pub struct CustomIcon{
     file_path: String,
@@ -42,9 +43,19 @@ pub fn update() -> Result<(), Box<dyn std::error::Error>> {
 
     match status.uptodate() {
         true => {
+            Notification::new()
+                .summary("GameMon Update")
+                .body("GameMon is up to date!  Great Job! :-)")
+                .show()
+                .unwrap();
             println!("GameMon is up to date!  Great Job! :-)");
         },
         false => {
+            Notification::new()
+                .summary("GameMon Update")
+                .body(format!("GameMon updated to version {}.  Enjoy! ;-)", status.version()).as_str())
+                .show()
+                .unwrap();
             println!("GameMon updated to version {}.  Enjoy! ;-)", status.version());
         },
     }
