@@ -1,6 +1,6 @@
-use std::env;
+use std::{env, error::Error, io::Write};
 use image::ImageReader;
-use self_update::cargo_crate_version;
+use self_update::{backends::github::Update, cargo_crate_version, self_replace, ArchiveKind};
 use notify_rust::Notification;
 
 pub struct CustomIcon{
@@ -29,38 +29,20 @@ impl CustomIcon {
     }
 }
 
-pub fn update() -> Result<(), Box<dyn std::error::Error>> {
-    let status = self_update::backends::github::Update::configure()
-        .repo_owner("Akinus21")
-        .repo_name("GameMon")
-        .bin_name("github")
+pub fn update() -> Result<(), Box<dyn Error>> {
+    // Configure and initiate the update process
+    let status = Update::configure()
+        .repo_owner("Akinus21") // Replace with your GitHub username
+        .repo_name("GameMon")  // Replace with your GitHub repo name
+        .bin_name("GameMon")   // The name of your executable
         .show_download_progress(true)
-        .current_version(cargo_crate_version!())
         .build()?
         .update()?;
 
-    println!("Update status: `{}`!", status.version());
-
-    match status.uptodate() {
-        true => {
-            Notification::new()
-                .summary("GameMon Update")
-                .body("GameMon is up to date!  Great Job! :-)")
-                .show()
-                .unwrap();
-            println!("GameMon is up to date!  Great Job! :-)");
-        },
-        false => {
-            Notification::new()
-                .summary("GameMon Update")
-                .body(format!("GameMon updated to version {}.  Enjoy! ;-)", status.version()).as_str())
-                .show()
-                .unwrap();
-            println!("GameMon updated to version {}.  Enjoy! ;-)", status.version());
-        },
-    }
-
+    // Log the successful update
+    println!("Updated to version: {}", status.version());
     Ok(())
-
 }
+
+
 

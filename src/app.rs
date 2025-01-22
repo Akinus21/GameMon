@@ -33,6 +33,7 @@ pub fn watchdog() -> Result<(), Box<dyn std::error::Error + Send>> {
         // Check for updates
         if update_timer >= 60 {
             // Check for updates every 60 seconds
+            println!("Checking for updates");
             _update = util::update();
             update_timer = 0;
         }
