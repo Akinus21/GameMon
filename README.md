@@ -6,8 +6,9 @@ Gaming Monitor is a system tray application that monitors specific executables a
 - **src/main.rs**: Entry point of the application. Initializes the system tray, sets up the GUI, and starts monitoring specified processes.
 - **src/app.rs**: Defines the main application structure, including methods for starting and stopping process monitoring and handling command execution.
 - **src/config.rs**: Manages configuration of entries, including loading and saving configuration data, and defining the structure for each entry.
-- **src/gui.rs**: Implements the GUI using a library like eframe or egui, providing an interface for users to manage entries.
+- **src/bin/GameMon-gui.rs**: Implements the GUI using Iced, providing an interface for users to manage entries.
 - **src/tray.rs**: Handles system tray functionality, including creating the tray icon and responding to user interactions.
+- **src/bin/GameMon-update.rs**: Handles updating the application from this repository, from the newest release. 
 
 ## Setup Instructions
 
