@@ -4,7 +4,6 @@ use std::sync::mpsc;
 use std::{env, fs, thread};
 use std::time::Duration;
 
-use tray::Tray;
 
 mod gui;
 mod config;
@@ -13,7 +12,6 @@ mod util;
 mod app;
  
 pub fn main() {
-
     // Check the OS and set the directory accordingly
     if cfg!(target_os = "linux") {
         let dir_path = dirs::data_dir()
@@ -29,7 +27,7 @@ pub fn main() {
                 println!("Directory created at {:?}", dir_path);
             }
         } else {
-            println!("Directory already exists at {:?}", dir_path);
+            // println!("Directory already exists at {:?}", dir_path);
         }
 
         env::set_current_dir(dir_path ).expect("Failed to change directory");

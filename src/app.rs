@@ -1,8 +1,7 @@
 use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, RefreshKind, System, UpdateKind};
-use std::{process::Command, sync::{Arc, mpsc}, thread};
+use std::{process::Command, sync::{mpsc, Arc}, thread};
 use std::time::Duration;
 use crate::config::Config;
-use crate::util;
 // use notify_rust::Notification;
 use dashmap::DashMap;
 
@@ -23,17 +22,8 @@ pub fn watchdog() -> Result<(), Box<dyn std::error::Error + Send>> {
     let refresh_kind = RefreshKind::everything();
     let mut sys = System::new_with_specifics(refresh_kind);
     
-// Set the update timer (Starts at max to ensure check on first run.)
-    let mut update_timer = 60;
-
     loop {
-        // Check for updates
-        if update_timer >= 60 {
-            // Check for updates every 60 seconds
-            let _u = util::update();
-            update_timer = 0;
-        }
-
+        
         // Reload configuration on each check
         let config_path = &*Config::get_config_path().unwrap();
         let config = Config::load_from_file(config_path)?;
@@ -87,8 +77,6 @@ pub fn watchdog() -> Result<(), Box<dyn std::error::Error + Send>> {
     
         // Sleep for a short interval before the next check
         thread::sleep(Duration::from_secs(5));
-
-        update_timer += 5;
     }
 }    
 

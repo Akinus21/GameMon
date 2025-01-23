@@ -1,6 +1,5 @@
-use iced::alignment::Horizontal::{Left, Center as xCenter, Right};
-use iced::alignment::Vertical::{Top, Center as yCenter, Bottom};
-use iced::widget::text_editor::Edit;
+use iced::alignment::Horizontal::{Left, Center as xCenter};
+use iced::alignment::Vertical::Bottom;
 use iced::widget::{
     button,
     column,
@@ -10,16 +9,13 @@ use iced::widget::{
     text,
     text_editor,
     text_input,
-    Column,
     Row,
-    Scrollable,
-    TextInput,
     vertical_rule,
     vertical_space,
     horizontal_space,
 };
 use iced::Length::Fill;
-use iced::{application, theme, Element, Theme};
+use iced::Theme;
 use serde::{Serialize, Deserialize};
 use toml::ser;
 use std::{env, fs};
@@ -451,6 +447,7 @@ impl Gui {
 }
 
 pub fn main() -> iced::Result {
+
     // Check the OS and set the directory accordingly
     if cfg!(target_os = "linux") {
         let dir_path = dirs::data_dir()
@@ -483,10 +480,9 @@ pub fn main() -> iced::Result {
         println!("Running on an unknown OS");
         // Fallback actions
     }
-    
+
     // Start the GUI application
     iced::application("GameMon", Gui::update, Gui::view).theme(Gui::theme).run()
     // iced::run("GameMon", Gui::update, Gui::view)
 }
-
 
