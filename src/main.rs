@@ -4,6 +4,7 @@ use std::sync::mpsc;
 use std::{env, fs, thread};
 use std::time::Duration;
 
+use ksni::TrayMethods;
 
 mod gui;
 mod config;
@@ -16,6 +17,8 @@ pub fn main() {
     //run updater
     let _child = std::process::Command::new("./GameMon-update")
         .spawn();
+
+    let original_dir = env::current_dir().unwrap();
 
     // Check the OS and set the directory accordingly
     if cfg!(target_os = "linux") {
@@ -82,7 +85,7 @@ pub fn main() {
 
     // Create a channel for communication
     let (wtx, wrx) = mpsc::channel(); // For watchdog
-    // let (ttx, trx) = mpsc::channel(); // For tray events
+    let (ttx, trx) = mpsc::channel(); // For tray
 
 
     // Spawn the watchdog function in its own thread
@@ -94,12 +97,12 @@ pub fn main() {
         }
     });
 
-    // // Spawn the tray logic in its own thread
-    // thread::spawn(move || {
-    //     let tray = Tray::new(ttx);
-    //     tray.spawn();
-    //     gtk::main(); // Keep GTK running in the tray thread
-    // });
+    // Spawn the tray logic in its own thread
+    thread::spawn(move || {
+        let _ = gtk::init();
+        tray::spawn_tray(ttx.clone());
+        gtk::main(); // Keep GTK running in the tray thread
+    });
 
     loop {
         // Handle watchdog messages
@@ -119,24 +122,33 @@ pub fn main() {
                 // No messages yet, continue running
             }
         }
-
-        // // Handle tray events
-        // if let Ok(event) = trx.try_recv() {
-        //     println!("Tray event recieved: {}", event);
-        //     match event.as_str() {
-        //         "Show GUI" => {
-        //             println!("Show GUI triggered.");
-        //             // let result = gui::show_gui();
-        //             // assert!(result.is_ok());
-        //         }
-        //         "Exit" => {
-        //             println!("Exit triggered. Exiting application...");
-        //             break;
-        //         }
-        //         _ => eprintln!("Unknown menu event: {}", event),
-        //     }
-        // }
-
+    
+        // Handle tray messages
+        match trx.try_recv() {
+            Ok(message) => {
+                match message.as_str() {
+                    "quit" => {
+                        println!("Received quit message from tray.");
+                        break; // Exit the main loop
+                    }
+                    "show_gui" => {
+                        println!("Received Show GUI message from tray.");
+                            gui::show_gui(&original_dir);
+                    }
+                    other => {
+                        println!("Received message from tray: {}", other);
+                    }
+                }
+            }
+            Err(mpsc::TryRecvError::Disconnected) => {
+                eprintln!("Tray thread disconnected. Exiting...");
+                break;
+            }
+            Err(mpsc::TryRecvError::Empty) => {
+                // No tray messages yet, continue running
+            }
+        }
+    
         // Keep the main thread alive with a sleep
         thread::sleep(Duration::from_secs(1));
     }

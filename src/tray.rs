@@ -1,57 +1,54 @@
-use std::{sync::mpsc::Sender, thread, time::Duration};
-use tray_icon::{menu::{Menu, MenuEvent, MenuItem}, TrayIconBuilder, TrayIconEvent};
-use crate::util::CustomIcon;
+use libappindicator::{AppIndicator, AppIndicatorCategory};
+use libappindicator::AppIndicatorStatus;
+use gio::prelude::*;
+use gtk::prelude::{ApplicationExt, ApplicationExtManual, *};
+use std::env;
+use std::sync::{mpsc, Arc, Mutex};
 
-pub struct Tray {
-    sender: Sender<String>, // Channel to send menu events
-}
+pub fn spawn_tray(sender: mpsc::Sender<String>) {
+    let application = gtk::Application::new(
+        Some("com.example.trayapp"),
+        gtk::gio::ApplicationFlags::FLAGS_NONE,
+    );
 
-impl Tray {
-    pub fn new(sender: Sender<String>) -> Self {
-        Tray { sender }
-    }
+    // Wrap the sender in an Arc<Mutex<>> to make it thread-safe and shareable
+    let sender = Arc::new(Mutex::new(sender));
 
-    pub fn spawn(&self) {
-        // Initialize the GTK library
-        gtk::init().unwrap();
+    application.connect_activate(move |_| {
+        let mut indicator = AppIndicator::new("GameMon", "applications-internet");
+        indicator.set_status(AppIndicatorStatus::Active);
+        indicator.set_title("GameMon - Gaming Monitor");
+        let icon_path = env::current_dir().unwrap().join("resources/gamemon.png");
+        let icon = icon_path.to_str().unwrap();
+        println!("DEBUG: Icon at {:?}", &icon);
+        indicator.set_icon(icon);
 
-        // Create the tray icon
-        let icon = CustomIcon::new("resources/tray_icon-green.png").get_icon();
+        let mut menu = gtk::Menu::new();
+        let show_gui = gtk::MenuItem::with_label("Show Config GUI");
 
-        // Create the tray menu items
-        let show_gui_item = MenuItem::new("Show GUI", true, None);
-        let exit_item = MenuItem::new("Exit", true, None);
+        // Clone the Arc<Mutex<Sender>> for the closure
+        let sender_clone = Arc::clone(&sender);
+        show_gui.connect_activate(move |_| {
+            if let Ok(sender) = sender_clone.lock() {
+                sender.send("show_gui".to_string()).expect("Failed to send show_gui message");
+            }
+        });
+        menu.append(&show_gui);
 
-        // Create the tray menu
-        let tray_menu = Menu::new();
-        tray_menu.append(&show_gui_item).unwrap();
-        tray_menu.append(&exit_item).unwrap();
+        let quit_item = gtk::MenuItem::with_label("Quit");
 
-        // Build the tray app
-        let _tray_icon = TrayIconBuilder::new()
-            .with_menu(Box::new(tray_menu))
-            .with_tooltip("GameMon Tray")
-            .with_icon(icon)
-            .build()
-            .unwrap();
+        // Clone the Arc<Mutex<Sender>> for the closure
+        let sender_clone = Arc::clone(&sender);
+        quit_item.connect_activate(move |_| {
+            if let Ok(sender) = sender_clone.lock() {
+                sender.send("quit".to_string()).expect("Failed to send quit message");
+            }
+        });
+        menu.append(&quit_item);
 
-        let sender_clone = self.sender.clone();
+        menu.show_all();
+        indicator.set_menu(&mut menu);
+    });
 
-        loop {
-            if let Ok(event) = TrayIconEvent::receiver().try_recv() {
-                println!("tray event triggered: {:?}", event);
-            };
-            
-            if let Ok(event) = MenuEvent::receiver().try_recv() {
-                println!("menu event triggered: {:?}", event);
-                if let Err(e) = sender_clone.send(format!("{:?}", event)) {
-                    eprintln!("Failed to send event: {:?}", e);
-                }
-            };
-
-            thread::sleep(Duration::from_secs(1));
-
-        }
-    }
-
+    application.run();
 }

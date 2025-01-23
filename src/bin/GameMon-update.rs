@@ -84,14 +84,7 @@ pub fn update() -> Result<(), Box<dyn std::error::Error>> {
         let tmp_extract_dir = Path::new(&tmp_dir).join("GameMon_update");
         extract_tar_gz(&tmp_archive_path, &tmp_extract_dir)?;
 
-        // Replace the current executable
-        let new_exe = tmp_extract_dir.join("GameMon");
-        let new_gui= tmp_extract_dir.join("GameMon-gui");
-        let new_updater= tmp_extract_dir.join("GameMon-update");
-        let curr_exe = Path::new(&env::current_dir().unwrap()).join("GameMon");
-        let curr_gui = Path::new(&env::current_dir().unwrap()).join("GameMon-gui");
-        let curr_updater = Path::new(&env::current_dir().unwrap()).join("GameMon-update_tmp");
-        
+        // Replace the current executable  
 
         // Stop all instances of GameMon first
         println!("Stopping all GameMon processes...");
@@ -100,20 +93,40 @@ pub fn update() -> Result<(), Box<dyn std::error::Error>> {
         // Then replace
 
         let result = if cfg!(target_os = "linux") {
+            let new_exe = tmp_extract_dir.join("GameMon");
+            let new_gui= tmp_extract_dir.join("GameMon-gui");
+            let new_updater= tmp_extract_dir.join("GameMon-update");
+            let curr_exe = Path::new(&env::current_dir().unwrap()).join("GameMon");
+            let curr_gui = Path::new(&env::current_dir().unwrap()).join("GameMon-gui");
+            let curr_updater = Path::new(&env::current_dir().unwrap()).join("GameMon-update_tmp");
+            let new_res = tmp_extract_dir.join("resources");
+            let curr_res = Path::new(&env::current_dir().unwrap()).join("resources");
             println!("Replacing GUI binary with new version...");
             fs::copy(new_gui, curr_gui)?;
             println!("Replacing GameMon binary with new version...");
             fs::copy(new_exe, curr_exe)?;
             println!("Replacing GameMon updater binary with new version...");
-            fs::copy(new_updater, curr_updater)
+            fs::copy(new_updater, curr_updater)?;
+            println!("Copying resources...");
+            fs::copy(new_res, curr_res)
 
         } else if cfg!(target_os = "windows") {
+            let new_exe = tmp_extract_dir.join("GameMon.exe");
+            let new_gui= tmp_extract_dir.join("GameMon-gui.exe");
+            let new_updater= tmp_extract_dir.join("GameMon-update.exe");
+            let curr_exe = Path::new(&env::current_dir().unwrap()).join("GameMon.exe");
+            let curr_gui = Path::new(&env::current_dir().unwrap()).join("GameMon-gui.exe");
+            let curr_updater = Path::new(&env::current_dir().unwrap()).join("GameMon-update_tmp.exe");
+            let new_res = tmp_extract_dir.join("resources");
+            let curr_res = Path::new(&env::current_dir().unwrap()).join("resources");            
             println!("Replacing GUI binary with new version...");
             fs::copy(new_gui, curr_gui)?;
             println!("Replacing GameMon binary with new version...");
             fs::copy(new_exe, curr_exe)?;
             println!("Replacing GameMon updater binary with new version...");
-            fs::copy(new_updater, curr_updater)
+            fs::copy(new_updater, curr_updater)?;
+            println!("Copying resources...");
+            fs::copy(new_res, curr_res)
 
 
         } else {

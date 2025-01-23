@@ -24,6 +24,7 @@ impl CustomIcon {
     }
 
     pub fn get_icon(&self) -> tray_icon::Icon {
+        println!("DEBUG: File Path: {:?}", self.file_path);
         let img = ImageReader::open(&self.file_path)
             .expect("Failed to open tray icon file")
             .decode()
