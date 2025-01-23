@@ -448,6 +448,10 @@ impl Gui {
 
 pub fn main() -> iced::Result {
 
+    //run updater
+    let _child = std::process::Command::new("./GameMon-update")
+        .spawn();
+
     // Check the OS and set the directory accordingly
     if cfg!(target_os = "linux") {
         let dir_path = dirs::data_dir()
