@@ -4,8 +4,6 @@ use std::sync::mpsc;
 use std::{env, fs, thread};
 use std::time::Duration;
 
-use ksni::TrayMethods;
-
 mod gui;
 mod config;
 mod tray;
@@ -35,7 +33,7 @@ pub fn main() {
         } else {
             // println!("Directory already exists at {:?}", dir_path);
         }
-
+        env::set_current_dir(dir_path ).expect("Failed to change directory");
         env::set_var("XDG_RUNTIME_DIR", "/run/user/1000");
 
 
@@ -130,7 +128,7 @@ pub fn main() {
                     }
                     "show_gui" => {
                         println!("Received Show GUI message from tray.");
-                            gui::show_gui(&env::current_dir().unwrap());
+                            gui::show_gui();
                     }
                     other => {
                         println!("Received message from tray: {}", other);

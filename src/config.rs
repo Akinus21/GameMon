@@ -2,7 +2,6 @@ use serde::{Serialize, Deserialize};
 use toml::ser;
 use std::fs;
 use std::error::Error;
-use std::path::PathBuf;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Config {
@@ -72,17 +71,4 @@ impl Config {
         // Return the file path as a string
         Ok(config_file.to_str().unwrap().to_string())
     }
-}
-
-
-pub fn initialize() -> PathBuf {
-    let config_dir = dirs::config_dir().unwrap().join("gamemon"); 
-    if !config_dir.exists() {
-        let _ = std::fs::create_dir(&config_dir);
-    };
-    let config_file = config_dir.join("config.toml");
-    if !config_file.exists() {
-        let _ = std::fs::File::create_new(&config_file);
-    };
-    config_file
 }

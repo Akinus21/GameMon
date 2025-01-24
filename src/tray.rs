@@ -1,6 +1,5 @@
-use libappindicator::{AppIndicator, AppIndicatorCategory};
+use libappindicator::AppIndicator;
 use libappindicator::AppIndicatorStatus;
-use gio::prelude::*;
 use gtk::prelude::{ApplicationExt, ApplicationExtManual, *};
 use std::env;
 use std::sync::{mpsc, Arc, Mutex};

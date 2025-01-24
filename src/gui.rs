@@ -1,19 +1,18 @@
+use std::env;
 use std::process::{Command, exit};
-use std::path::{Path, PathBuf};
-use std::fs;
 
-pub fn show_gui(original_dir: &PathBuf) {
+pub fn show_gui() {
     // Ensure the executable path is constructed correctly
     
     let gui_path = match std::env::consts::OS {
         "linux" => {
-            original_dir.join("GameMon-gui")
+            env::current_dir().unwrap().join("GameMon-gui")
         }
         "windows" => {
-            original_dir.join("GameMon-gui.exe")
+            env::current_dir().unwrap().join("GameMon-gui.exe")
         }
         _ => {
-            original_dir.join("GameMon-gui")
+            env::current_dir().unwrap().join("GameMon-gui")
         }
     };
 
@@ -27,7 +26,7 @@ pub fn show_gui(original_dir: &PathBuf) {
 
     // Attempt to spawn the process and handle any errors
     match Command::new(gui_path_str).spawn() {
-        Ok(mut child) => {
+        Ok(_child) => {
             // Optionally, handle child process output, status, etc.
             println!("Successfully spawned GameMon-gui.");
         }
