@@ -7,7 +7,6 @@ use std::time::Duration;
 mod gui;
 mod config;
 mod tray;
-mod util;
 mod app;
  
 pub fn main() {
