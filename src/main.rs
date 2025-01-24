@@ -18,8 +18,6 @@ pub fn main() {
     let _child = std::process::Command::new("./GameMon-update")
         .spawn();
 
-    let original_dir = env::current_dir().unwrap();
-
     // Check the OS and set the directory accordingly
     if cfg!(target_os = "linux") {
         let dir_path = dirs::data_dir()
@@ -38,7 +36,6 @@ pub fn main() {
             // println!("Directory already exists at {:?}", dir_path);
         }
 
-        env::set_current_dir(dir_path ).expect("Failed to change directory");
         env::set_var("XDG_RUNTIME_DIR", "/run/user/1000");
 
 
@@ -133,7 +130,7 @@ pub fn main() {
                     }
                     "show_gui" => {
                         println!("Received Show GUI message from tray.");
-                            gui::show_gui(&original_dir);
+                            gui::show_gui(&env::current_dir().unwrap());
                     }
                     other => {
                         println!("Received message from tray: {}", other);

@@ -63,23 +63,32 @@ impl Config {
         Ok(())
     }
 
-     // Checks if config.toml exists in the current directory. If not, creates it.
-     pub fn get_config_path() -> Result<String, Box<dyn Error>> {
-        // Get the current working directory
-        let current_dir = std::env::current_dir()?;
+    // Checks if config.toml exists in the current directory. If not, creates it.
+    pub fn get_config_path() -> Result<String, Box<dyn Error>> {
+        
+        //Define config directory
+        let config_dir = dirs::config_dir().unwrap().join("gamemon"); 
+
+        // Check if directory exists, if not, create it
+        if !config_dir.exists() {
+            match std::fs::create_dir(&config_dir){
+                Ok(_) => println!("Configuration directory created successfully!"),
+                Err(e) => println!("Error creating configuration directory: {:?}", e),
+            }
+        };
 
         // Define the config file path
-        let config_path = current_dir.join("config.toml");
+        let config_file = config_dir.join("config.toml");
 
         // Check if the file exists
-        if !config_path.exists() {
+        if !config_file.exists() {
             // If the file doesn't exist, create it with an empty config
             let default_config = Config { entries: Vec::new() };
-            default_config.save_to_file(config_path.to_str().unwrap())?;
+            default_config.save_to_file(config_file.to_str().unwrap())?;
         }
 
         // Return the file path as a string
-        Ok(config_path.to_str().unwrap().to_string())
+        Ok(config_file.to_str().unwrap().to_string())
     }
 }
 

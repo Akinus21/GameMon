@@ -1,7 +1,8 @@
+use dirs::config_dir;
 use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, RefreshKind, System, UpdateKind};
-use std::{process::Command, sync::{mpsc, Arc}, thread};
+use std::{path::PathBuf, process::Command, sync::{mpsc, Arc}, thread};
 use std::time::Duration;
-use crate::config::Config;
+use crate::config::{self, Config};
 // use notify_rust::Notification;
 use dashmap::DashMap;
 
@@ -21,8 +22,15 @@ pub fn watchdog() -> Result<(), Box<dyn std::error::Error + Send>> {
     // System info setup
     let refresh_kind = RefreshKind::everything();
     let mut sys = System::new_with_specifics(refresh_kind);
+
+    let mut update_timer = 600;
     
     loop {
+        if update_timer >= 600 {
+            //run updater every 10 minutes
+            let _child = std::process::Command::new("./GameMon-update")
+            .spawn();
+        }
         
         // Reload configuration on each check
         let config_path = &*Config::get_config_path().unwrap();
@@ -77,6 +85,7 @@ pub fn watchdog() -> Result<(), Box<dyn std::error::Error + Send>> {
     
         // Sleep for a short interval before the next check
         thread::sleep(Duration::from_secs(5));
+        update_timer += 5;
     }
 }    
 

@@ -93,14 +93,17 @@ pub fn update() -> Result<(), Box<dyn std::error::Error>> {
         // Then replace
 
         let result = if cfg!(target_os = "linux") {
+            let appdata_path = dirs::data_dir()
+                .unwrap_or_else(|| std::path::PathBuf::from("~/.local/share"))
+                .join("gamemon");
             let new_exe = tmp_extract_dir.join("GameMon");
             let new_gui= tmp_extract_dir.join("GameMon-gui");
             let new_updater= tmp_extract_dir.join("GameMon-update");
-            let curr_exe = Path::new(&env::current_dir().unwrap()).join("GameMon");
-            let curr_gui = Path::new(&env::current_dir().unwrap()).join("GameMon-gui");
-            let curr_updater = Path::new(&env::current_dir().unwrap()).join("GameMon-update_tmp");
-            let new_res = tmp_extract_dir.join("resources");
-            let curr_res = Path::new(&env::current_dir().unwrap()).join("resources");
+            let curr_exe = appdata_path.join("GameMon");
+            let curr_gui = appdata_path.join("GameMon-gui");
+            let curr_updater = appdata_path.join("GameMon-update_tmp");
+            let new_icon = tmp_extract_dir.join("resources/gamemon.png");
+            let curr_icon = appdata_path.join("resources/gamemon.png");
             println!("Replacing GUI binary with new version...");
             fs::copy(new_gui, curr_gui)?;
             println!("Replacing GameMon binary with new version...");
@@ -108,17 +111,22 @@ pub fn update() -> Result<(), Box<dyn std::error::Error>> {
             println!("Replacing GameMon updater binary with new version...");
             fs::copy(new_updater, curr_updater)?;
             println!("Copying resources...");
-            fs::copy(new_res, curr_res)
+            fs::copy(new_icon, curr_icon)
 
         } else if cfg!(target_os = "windows") {
+            let appdata = env::var("APPDATA").unwrap_or_else(|_| {
+                eprintln!("Failed to get APPDATA environment variable. Using default path.");
+                String::from("C:\\Users\\Default\\AppData\\Roaming")
+            });
+            let appdata_path = Path::new(&appdata);
             let new_exe = tmp_extract_dir.join("GameMon.exe");
             let new_gui= tmp_extract_dir.join("GameMon-gui.exe");
             let new_updater= tmp_extract_dir.join("GameMon-update.exe");
-            let curr_exe = Path::new(&env::current_dir().unwrap()).join("GameMon.exe");
-            let curr_gui = Path::new(&env::current_dir().unwrap()).join("GameMon-gui.exe");
-            let curr_updater = Path::new(&env::current_dir().unwrap()).join("GameMon-update_tmp.exe");
-            let new_res = tmp_extract_dir.join("resources");
-            let curr_res = Path::new(&env::current_dir().unwrap()).join("resources");            
+            let curr_exe = appdata_path.join("GameMon.exe");
+            let curr_gui = appdata_path.join("GameMon-gui.exe");
+            let curr_updater = appdata_path.join("GameMon-update_tmp.exe");
+            let new_icon = tmp_extract_dir.join("resources/gamemon.png");
+            let curr_icon = appdata_path.join("resources/gamemon.png");            
             println!("Replacing GUI binary with new version...");
             fs::copy(new_gui, curr_gui)?;
             println!("Replacing GameMon binary with new version...");
@@ -126,7 +134,7 @@ pub fn update() -> Result<(), Box<dyn std::error::Error>> {
             println!("Replacing GameMon updater binary with new version...");
             fs::copy(new_updater, curr_updater)?;
             println!("Copying resources...");
-            fs::copy(new_res, curr_res)
+            fs::copy(new_icon, curr_icon)
 
 
         } else {
