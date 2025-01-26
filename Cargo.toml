@@ -10,15 +10,11 @@ rust-version = "1.84.0"
 
 [[bin]]
 name = "GameMon-gui"
-path = "src/gui/main.rs"
+path = "src/gui.rs"
 
 [[bin]]
 name = "GameMon-update"
-path = "src/updater/main.rs"
-
-[[bin]]
-name = "GameMon"
-path = "src/service/main.rs"
+path = "src/updater.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

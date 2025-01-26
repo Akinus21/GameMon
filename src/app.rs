@@ -16,15 +16,12 @@ use iced::widget::{
 };
 use iced::Length::Fill;
 use iced::Theme;
-use std::error::Error;
-use dirs;
-use crate::config::{Config, Entry}; // Import the config module
+use crate::config;
 
-
-struct Gui {
+pub struct Gui {
     game_name_field: String,      // List of game names
     selected_game_name: Option<String>, // Currently selected game name
-    selected_game_entry: Option<Entry>, // Currently selected game entry
+    selected_game_entry: Option<config::Entry>, // Currently selected game entry
     game_executable_field: String, // List of game executables
     start_commands_field: text_editor::Content,  // List of start commands
     end_commands_field: text_editor::Content,    // List of end commands
@@ -34,7 +31,7 @@ struct Gui {
 
 impl Default for Gui{
     fn default() -> Self {
-        let config = Config::load_from_file(&*Config::get_config_path().unwrap()).unwrap();
+        let config = config::Config::load_from_file(&*config::Config::get_config_path().unwrap()).unwrap();
         let mut game_names = Vec::new();
 
         for entry in config.entries.clone() {
@@ -55,7 +52,7 @@ impl Default for Gui{
 }
 
 #[derive(Debug, Clone)]
-enum Message {
+pub enum Message {
     GameNameChanged(String),
     GameExectuableChanged(String),
     GameSelected(String),
@@ -67,11 +64,11 @@ enum Message {
 }
 
 impl Gui {
-    fn theme(&self) -> Theme {
+    pub fn theme(&self) -> Theme {
         Theme::Dracula
     }
 
-    fn update(&mut self, message: Message) {
+    pub fn update(&mut self, message: Message) {
         match message {
             Message::GameNameChanged(content) => {
                 self.game_name_field = content;
@@ -97,7 +94,7 @@ impl Gui {
                     self.save_current_entry();
                 }
                 
-                let config = Config::load_from_file(&*Config::get_config_path().unwrap()).unwrap();
+                let config = config::Config::load_from_file(&*config::Config::get_config_path().unwrap()).unwrap();
                 let selected_entry = config.entries.iter().find(|entry| entry.game_name == game_name).unwrap();
                 self.selected_game_entry = Some(selected_entry.clone());
 
@@ -121,10 +118,10 @@ impl Gui {
                 self.save_current_entry();
             }
             Message::RemoveEntry => {
-                let mut config = Config::load_from_file(&*Config::get_config_path().unwrap()).unwrap();
+                let mut config = config::Config::load_from_file(&*config::Config::get_config_path().unwrap()).unwrap();
                 if let Some(index) = config.entries.iter().position(|entry| entry.game_name == self.game_name_field){
                     config.entries.remove(index);
-                    Config::save_to_file(&config, &*Config::get_config_path().unwrap()).unwrap();
+                    config::Config::save_to_file(&config, &*config::Config::get_config_path().unwrap()).unwrap();
                 
                     self.game_name_field = "Enter game name...".to_string();
                     self.game_executable_field = "Enter game executable...".to_string();
@@ -136,7 +133,7 @@ impl Gui {
         }
     }
 
-    fn view(&self) -> Row<Message> {
+    pub fn view(&self) -> Row<Message> {
         // Definte left container
         let left_container = container(
             column![
@@ -266,8 +263,8 @@ impl Gui {
     }
 
 
-    fn save_current_entry(&mut self) {
-        let mut config = Config::load_from_file(&*Config::get_config_path().unwrap()).unwrap();
+    pub fn save_current_entry(&mut self) {
+        let mut config = config::Config::load_from_file(&*config::Config::get_config_path().unwrap()).unwrap();
         if let Some(index) = config.entries.iter().position(|entry| entry.game_name == self.game_name_field){
             
             println!("Entry already exists at index {}", index);
@@ -281,7 +278,7 @@ impl Gui {
             
             println!("Entry does not exist");
 
-            let new_entry = Entry {
+            let new_entry = config::Entry {
                 game_name: self.game_name_field.clone(),
                 executable: self.game_executable_field.clone(),
                 start_commands: self.start_commands_field.text().split("\n").map(|s| s.to_string()).collect(),
@@ -290,18 +287,8 @@ impl Gui {
 
             config.entries.push(new_entry);
         }
-        Config::save_to_file(&config, &*Config::get_config_path().unwrap()).unwrap();
+        config::Config::save_to_file(&config, &*config::Config::get_config_path().unwrap()).unwrap();
         self.game_names = config.entries.iter().map(|e| e.game_name.clone()).collect(); // Update game names
         self.entry_changed = false;
     }
-}
-
-pub fn main() -> iced::Result {
-
-    //run updater
-    let _child = std::process::Command::new("./GameMon-update")
-        .spawn();
-
-    // Start the GUI application
-    iced::application("GameMon", Gui::update, Gui::view).theme(Gui::theme).run()
 }
