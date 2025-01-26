@@ -39,7 +39,14 @@ pub fn update() -> Result<(), Box<dyn std::error::Error>> {
     if latest_version == current_version {
         println!("You are already on the latest version: {}", current_version);
         if !is_service_running(){
-            let _ = start_game_mon();
+            let _start = match start_game_mon(){
+                Ok(_) => {
+                    println!("Restarted GameMon Successfully!")
+                }
+                Err(e) => {
+                    println!("Error restarting GameMon: {:?}", e)
+                }
+            };
         }
         return Ok(()); // No update needed
     }
@@ -178,6 +185,17 @@ pub fn update() -> Result<(), Box<dyn std::error::Error>> {
         
     } else {
         println!("User chose not to update.");
+    }
+
+    if !is_service_running(){
+        let _start = match start_game_mon(){
+            Ok(_) => {
+                println!("Restarted GameMon Successfully!")
+            }
+            Err(e) => {
+                println!("Error restarting GameMon: {:?}", e)
+            }
+        };
     }
 
     Ok(())
