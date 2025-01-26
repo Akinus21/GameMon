@@ -15,7 +15,6 @@ pub fn main() {
     let _ = update();
 }
 
-
 pub fn update() -> Result<(), Box<dyn std::error::Error>> {
     // GitHub API URL for latest release
     let latest_release_url = "https://api.github.com/repos/Akinus21/GameMon/releases/latest";
@@ -39,6 +38,9 @@ pub fn update() -> Result<(), Box<dyn std::error::Error>> {
     // Compare versions
     if latest_version == current_version {
         println!("You are already on the latest version: {}", current_version);
+        if !is_service_running(){
+            let _ = start_game_mon();
+        }
         return Ok(()); // No update needed
     }
 
@@ -384,4 +386,25 @@ fn is_active(program_name: &str) -> Result<bool, Box<dyn std::error::Error>>{
     };
 
     Ok(active)
+}
+
+fn is_service_running() -> bool {
+    // Verify if any GameMon processes (not GameMon-gui) are still running
+    let check_output = ProcessCommand::new("pgrep")
+    .arg("GameMon")
+    .output().unwrap();
+
+    // Store the result of from_utf8_lossy in a `let` binding to ensure it's not a temporary
+    let remaining_processes = String::from_utf8_lossy(&check_output.stdout);
+
+    // Filter out GameMon-gui by excluding it from the list of processes
+    let remaining_processes: Vec<&str> = remaining_processes
+    .lines()
+    .filter(|line| !line.contains("GameMon-gui"))
+    .collect();
+
+    match remaining_processes.len(){
+        0 => false,
+        _ => true,
+    }
 }
