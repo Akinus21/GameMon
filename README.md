@@ -1,43 +1,36 @@
-# GameMon
-Gaming Monitor is a system tray application that monitors specific executables and executes configured commands on process start and end. It includes a GUI for configuring entries.
+# GameMon - Your Automated Gaming Companion
 
-## Project Structure
+GameMon is a cross-platform desktop application designed to enhance your gaming experience by automating tasks and managing processes related to your games.  It allows you to define specific commands or scripts to be executed when a game starts and ends, offering a seamless way to optimize your system for gaming and restore it to its normal state afterward.
 
-- **src/main.rs**: Entry point of the application. Initializes the system tray, sets up the GUI, and starts monitoring specified processes.
-- **src/app.rs**: Defines the main application structure, including methods for starting and stopping process monitoring and handling command execution.
-- **src/config.rs**: Manages configuration of entries, including loading and saving configuration data, and defining the structure for each entry.
-- **src/bin/GameMon-gui.rs**: Implements the GUI using Iced, providing an interface for users to manage entries.
-- **src/tray.rs**: Handles system tray functionality, including creating the tray icon and responding to user interactions.
-- **src/bin/GameMon-update.rs**: Handles updating the application from this repository, from the newest release. 
+## Features
 
-## Setup Instructions
+* Process Monitoring: GameMon intelligently monitors for specified game executables and detects when they start or stop.
+* Customizable Commands: Execute tailored commands or scripts before and after your gaming sessions. This could include:
+    * Toggling performance settings (e.g., CPU governor, fan curves)
+    * Switching audio outputs
+    * Starting or stopping background applications (e.g., Discord, streaming software)
+    * Adjusting display settings
+    * Mounting or unmounting game-specific virtual drives
+* Cross-Platform Compatibility: Supports Linux, Windows, and macOS, ensuring flexibility across different operating systems.
+* Tray Icon Integration: A discreet tray icon provides quick access to settings and information without interrupting your gameplay.
+* Graphical User Interface: A user-friendly GUI simplifies the process of configuring game entries and associated commands.
 
-1. Ensure you have Rust and Cargo installed on your machine.
-2. Clone the repository:
-   ```
-   git clone <repository-url>
-   ```
-3. Navigate to the project directory:
-   ```
-   cd GameMon
-   ```
-4. Build the project:
-   ```
-   cargo build
-   ```
+## Use Cases
 
-## Usage Guidelines
+* Boost Performance: Automatically disable power-saving features and maximize performance when launching a demanding game.
+* Immersive Audio: Switch to your preferred gaming headset when the game starts and revert to your default speakers afterward.
+* Streamlined Setup: Launch necessary applications like Discord, OBS Studio, or your chat client along with your game.
+* VR Optimization: Configure your system specifically for VR gaming, including launching SteamVR or Oculus software.
+* Clean Up After Gaming: Close unnecessary applications, restore system settings, and unmount virtual drives when you're finished playing.
 
-- Run the application using:
-  ```
-  cargo run
-  ```
-- Use the GUI to add, edit, or remove executable entries and their associated commands.
+## Installation
 
-## Dependencies
+Pre-built binaries for GameMon will be available for download on the project's release page. Simply download the appropriate version for your operating system and follow the installation instructions.
 
-This project may use libraries such as `eframe`, `sysinfo`, and `serde` for GUI, system information, and serialization respectively. Ensure to check `Cargo.toml` for the complete list of dependencies.
+### Building from Source (for developers)
 
-## License
+GameMon is written in Rust. To build from source, you'll need to have a Rust development environment set up.
 
-This project is licensed under the MIT License. See the LICENSE file for more details.
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/gamemon.git  (Replace with your actual repository URL)
