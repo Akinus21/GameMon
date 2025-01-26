@@ -33,4 +33,11 @@ GameMon is written in Rust. To build from source, you'll need to have a Rust dev
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/gamemon.git  (Replace with your actual repository URL)
+   git clone https://github.com/Akinus21/GameMon.git
+Navigate to the project directory:
+   ```cd gamemon
+Build the project:
+   ```cargo build --release
+The resulting executable will be found in the target/release directory.
+
+(… and so on for the remaining sections)
