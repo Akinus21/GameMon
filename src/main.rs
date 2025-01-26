@@ -9,12 +9,13 @@ use GameMon::tray;
 
 pub fn main() {
 
-    //run updater
-    let _child = std::process::Command::new("./GameMon-update")
-        .spawn();
-
     // Check the OS and set the directory accordingly
     if cfg!(target_os = "linux") {
+        //run updater
+        let _child = std::process::Command::new("./GameMon-update")
+        .spawn();
+
+        // set path
         let dir_path = dirs::data_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("~/.local/share"))
         .join("gamemon");
@@ -37,6 +38,9 @@ pub fn main() {
     } else if cfg!(target_os = "windows") {
         println!("Running on Windows");
         // Windows-specific actions
+        //run updater
+        let _child = std::process::Command::new("./GameMon-update.exe")
+        .spawn();
 
         // Get the %APPDATA% directory
         let appdata = env::var("APPDATA").unwrap_or_else(|_| {
@@ -92,8 +96,31 @@ pub fn main() {
     // Spawn the tray logic in its own thread
     thread::spawn(move || {
         let _ = gtk::init();
-        tray::spawn_tray(ttx.clone());
-        gtk::main(); // Keep GTK running in the tray thread
+        match std::env::consts::OS {
+            "linux" => {
+                tray::spawn_tray_linux(ttx.clone()
+                    ,"GameMon - A Gaming Monitor".to_string()
+                    ,env::current_dir().unwrap().join("resources/gamemon.png")
+                    ,vec!(("show_gui".to_string(), "show_gui".to_string())
+                                ,("quit".to_string(), "quit".to_string())
+                            )
+                );
+                gtk::main(); // Keep GTK running in the tray thread
+            }
+            "windows" => {
+                
+            }
+            _ => {
+                tray::spawn_tray_linux(ttx.clone()
+                    ,"GameMon - A Gaming Monitor".to_string()
+                    ,env::current_dir().unwrap().join("resources/gamemon.png")
+                    ,vec!(("show_gui".to_string(), "show_gui".to_string())
+                                ,("quit".to_string(), "quit".to_string())
+                            )
+                );
+                gtk::main(); // Keep GTK running in the tray thread
+            }
+        };
     });
 
     loop {

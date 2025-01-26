@@ -1,10 +1,15 @@
 use libappindicator::AppIndicator;
 use libappindicator::AppIndicatorStatus;
 use gtk::prelude::{ApplicationExt, ApplicationExtManual, *};
-use std::env;
+use std::path::PathBuf;
 use std::sync::{mpsc, Arc, Mutex};
 
-pub fn spawn_tray(sender: mpsc::Sender<String>) {
+pub fn spawn_tray_linux(
+    sender: mpsc::Sender<String>,
+    title: String,
+    icon_path: PathBuf,
+    menu: Vec<(String, String)>, // Change &str to String for owned data
+) {
     let application = gtk::Application::new(
         Some("com.example.trayapp"),
         gtk::gio::ApplicationFlags::FLAGS_NONE,
@@ -14,39 +19,32 @@ pub fn spawn_tray(sender: mpsc::Sender<String>) {
     let sender = Arc::new(Mutex::new(sender));
 
     application.connect_activate(move |_| {
-        let mut indicator = AppIndicator::new("GameMon", "applications-internet");
+        // Build tray application
+        let mut indicator = AppIndicator::new("Example", "applications-internet");
         indicator.set_status(AppIndicatorStatus::Active);
-        indicator.set_title("GameMon - Gaming Monitor");
-        let icon_path = env::current_dir().unwrap().join("resources/gamemon.png");
+        indicator.set_title(&title);
         let icon = icon_path.to_str().unwrap();
-        println!("DEBUG: Icon at {:?}", &icon);
+        println!("DEBUG: Icon at {:?}", icon);
         indicator.set_icon(icon);
 
-        let mut menu = gtk::Menu::new();
-        let show_gui = gtk::MenuItem::with_label("Show Config GUI");
+        // Build menu
+        let mut new_menu = gtk::Menu::new();
+        for item in menu.clone() { // Cloning the owned `menu` vector
+            let mi = gtk::MenuItem::with_label(&item.0);
+            // Clone the Arc<Mutex<Sender>> for the closure
+            let sender_clone = Arc::clone(&sender);
+            mi.connect_activate(move |_| {
+                if let Ok(sender) = sender_clone.lock() {
+                    sender
+                        .send(item.1.clone()) // Clone the String to send it
+                        .expect("Failed to send message");
+                }
+            });
+            new_menu.append(&mi);
+        }
 
-        // Clone the Arc<Mutex<Sender>> for the closure
-        let sender_clone = Arc::clone(&sender);
-        show_gui.connect_activate(move |_| {
-            if let Ok(sender) = sender_clone.lock() {
-                sender.send("show_gui".to_string()).expect("Failed to send show_gui message");
-            }
-        });
-        menu.append(&show_gui);
-
-        let quit_item = gtk::MenuItem::with_label("Quit");
-
-        // Clone the Arc<Mutex<Sender>> for the closure
-        let sender_clone = Arc::clone(&sender);
-        quit_item.connect_activate(move |_| {
-            if let Ok(sender) = sender_clone.lock() {
-                sender.send("quit".to_string()).expect("Failed to send quit message");
-            }
-        });
-        menu.append(&quit_item);
-
-        menu.show_all();
-        indicator.set_menu(&mut menu);
+        new_menu.show_all();
+        indicator.set_menu(&mut new_menu);
     });
 
     application.run();
