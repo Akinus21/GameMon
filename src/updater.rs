@@ -9,8 +9,6 @@ use native_dialog::{MessageDialog, MessageType};
 use serde_json::Value;
 use std::process::Command as ProcessCommand;
 
-
-
 pub fn main() {
     let _ = update();
 }
