@@ -1,5 +1,6 @@
 use iced::alignment::Horizontal::{Left, Center as xCenter};
 use iced::alignment::Vertical::Bottom;
+use iced::widget::container::background;
 use iced::widget::{
     button,
     column,
@@ -15,7 +16,9 @@ use iced::widget::{
     horizontal_space,
 };
 use iced::Length::Fill;
-use iced::Theme;
+use iced::{Theme, color};
+use iced::theme::Palette;
+use iced::Color;
 use crate::config;
 
 pub struct Gui {
@@ -65,7 +68,14 @@ pub enum Message {
 
 impl Gui {
     pub fn theme(&self) -> Theme {
-        Theme::Dracula
+        let purple_haze_palette = Palette {
+            background: Color::from_rgb8(0x19, 0x08, 0x2F), // #19082F
+            text: Color::from_rgb8(0xE7, 0xE7, 0xE7),       // #E7E7E7
+            primary: Color::from_rgb8(0x92, 0xCF, 0x9C),    // #92CF9C
+            success: Color::from_rgb8(168, 80, 250),        //rgb(168, 80, 250)
+            danger: Color::from_rgb8(0xFF, 0x55, 0x55),     // #FF5555
+        };
+        iced::Theme::custom("Purple_Haze".to_string(), purple_haze_palette)
     }
 
     pub fn update(&mut self, message: Message) {
