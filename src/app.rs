@@ -98,7 +98,7 @@ impl Gui {
             }
             Message::GameSelected(game_name) => {
                 self.selected_game_name = Some(game_name.clone());
-                
+
                 // Save the current entry before switching if the game name field is not empty
                 if self.entry_changed {
                     self.save_current_entry();
