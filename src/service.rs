@@ -1,5 +1,5 @@
 use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, RefreshKind, System, UpdateKind};
-use std::{process::Command, sync::{mpsc, Arc}, thread};
+use std::{process::{Command, Stdio}, sync::{mpsc, Arc}, thread};
 use std::time::Duration;
 use crate::config::Config;
 use dashmap::DashMap;
@@ -20,10 +20,29 @@ pub fn watchdog() -> Result<(), Box<dyn std::error::Error + Send>> {
     loop {
         if update_timer >= 600 {
             //run updater every 10 minutes
-            let _child = std::process::Command::new(GAMEMON_UPDATER.as_path())
-            .spawn()
-            .expect("Failed to start updater");
-            update_timer = 0;
+
+            #[cfg(unix)]
+            {
+                let _child = std::process::Command::new(GAMEMON_UPDATER.as_path())
+                .spawn()
+                .expect("Failed to start updater");
+                update_timer = 0;
+            }
+
+            #[cfg(windows)]
+            {
+                let _child = std::process::Command::new("cmd")
+                .arg("/c")
+                .arg("start")
+                .arg("")
+                .arg(GAMEMON_UPDATER.as_path())
+                .stdout(Stdio::null()) // Suppress console output
+                .stderr(Stdio::null())
+                .spawn()
+                .expect("Failed to start updater");
+            }
+
+
         }
         
         // Reload configuration on each check

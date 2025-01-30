@@ -1,6 +1,6 @@
 
 use std::path::PathBuf;
-use std::process::{exit, Command};
+use std::process::{exit, Command, Stdio};
 use std::sync::mpsc;
 use std::{env, fs, thread};
 use std::time::Duration;
@@ -164,14 +164,60 @@ pub fn show_gui() {
     let gui_path_str = gui_path.to_str().expect("Failed to convert path to string");
 
     // Attempt to spawn the process and handle any errors
-    match Command::new(gui_path_str).spawn() {
-        Ok(_child) => {
-            // Optionally, handle child process output, status, etc.
-            println!("Successfully spawned GameMon-gui.");
+    #[cfg(unix)]{
+        match Command::new(gui_path_str).spawn() {
+            Ok(_child) => {
+                // Optionally, handle child process output, status, etc.
+                println!("Successfully spawned GameMon-gui.");
+            }
+            Err(e) => {
+                eprintln!("Failed to spawn GameMon-gui: {}", e);
+                exit(1); // Exit or handle the error appropriately
+            }
         }
-        Err(e) => {
-            eprintln!("Failed to spawn GameMon-gui: {}", e);
-            exit(1); // Exit or handle the error appropriately
+    }
+
+    #[cfg(windows)]
+    {
+
+        use std::ptr;
+        use winapi::um::shellapi::ShellExecuteW;
+        use winapi::um::winuser::SW_HIDE;
+        use winapi::um::winnt::LPCWSTR;
+        use std::ffi::OsStr;
+        use std::os::windows::ffi::OsStrExt;
+
+        fn to_wide_null(s: &str) -> Vec<u16> {
+            OsStr::new(s).encode_wide().chain(Some(0)).collect()
+        }
+
+        // let mut cmd = Command::new("cmd")
+        //     .arg("/c")
+        //     .arg("start")
+        //     .arg("")
+        //     .arg(&gui_path_str)
+        //     .stdout(Stdio::null()) // Suppress console output
+        //     .stderr(Stdio::null());
+
+        // match cmd.spawn() {
+        //     Ok(_child) => println!("Successfully spawned GameMon-gui."),
+        //     Err(e) => {
+        //         eprintln!("Failed to spawn GameMon-gui: {}", e);
+        //         std::process::exit(1);
+        //     }
+        // }
+
+        let path = to_wide_null(&gui_path_str);
+
+        unsafe {
+            ShellExecuteW(
+                ptr::null_mut(),
+                to_wide_null("open").as_ptr() as LPCWSTR,
+                path.as_ptr() as LPCWSTR,
+                ptr::null(),
+                ptr::null(),
+                SW_HIDE, // Ensures no console window appears
+            );
         }
     }
 }
