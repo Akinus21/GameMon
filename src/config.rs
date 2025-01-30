@@ -1,9 +1,84 @@
 use serde::{Serialize, Deserialize};
 use toml::ser;
-use std::fs;
+use std::{fs, io};
 use std::error::Error;
+use once_cell::sync::Lazy;
+use std::path::PathBuf;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+pub static GAMEMON_DIR: Lazy<PathBuf> = Lazy::new(|| {
+    if cfg!(target_os = "windows") {
+        dirs::data_dir().unwrap_or_else(|| PathBuf::from("C:\\Users\\Default\\AppData\\Roaming")).join("gamemon")
+    } else {
+        dirs::data_dir().unwrap_or_else(|| PathBuf::from("~/.local/share")).join("gamemon")
+    }
+});
+
+pub static GAMEMON_RESOURCE_DIR: Lazy<PathBuf> = Lazy::new(|| {
+    if cfg!(target_os = "windows") {
+        GAMEMON_DIR.join("resources")
+    } else {
+        GAMEMON_DIR.join("resources")
+    }
+});
+
+pub static GAMEMON_ICON: Lazy<PathBuf> = Lazy::new(|| {
+    if cfg!(target_os = "windows") {
+        GAMEMON_RESOURCE_DIR.join("gamemon.ico")
+    } else {
+        GAMEMON_RESOURCE_DIR.join("gamemon.png")
+    }
+});
+
+pub static GAMEMON_LOGO: Lazy<PathBuf> = Lazy::new(|| {
+    if cfg!(target_os = "windows") {
+        GAMEMON_RESOURCE_DIR.join("gamemon.png")
+    } else {
+        GAMEMON_RESOURCE_DIR.join("gamemon.png")
+    }
+});
+
+pub static GAMEMON_BIN_DIR: Lazy<PathBuf> = Lazy::new(|| {
+    if cfg!(target_os = "windows") {
+        GAMEMON_RESOURCE_DIR.join("\\bin")
+    } else {
+        GAMEMON_RESOURCE_DIR.join("/bin")
+    }
+});
+
+
+pub static GAMEMON_EXECUTABLE: Lazy<PathBuf> = Lazy::new(|| {
+    if cfg!(target_os = "windows") {
+        GAMEMON_DIR.join("GameMon.exe")
+    } else {
+        GAMEMON_DIR.join("GameMon")
+    }
+});
+
+pub static GAMEMON_UPDATER: Lazy<PathBuf> = Lazy::new(|| {
+    if cfg!(target_os = "windows") {
+        GAMEMON_DIR.join("GameMon-update.exe")
+    } else {
+        GAMEMON_DIR.join("GameMon-update")
+    }
+});
+
+pub static GAMEMON_GUI_EXECUTABLE: Lazy<PathBuf> = Lazy::new(|| {
+    if cfg!(target_os = "windows") {
+        GAMEMON_DIR.join("GameMon-gui.exe")
+    } else {
+        GAMEMON_DIR.join("GameMon-gui")
+    }
+});
+
+pub static GAMEMON_CONFIG_DIR: Lazy<PathBuf> = Lazy::new(|| {
+    dirs::config_dir().unwrap().join("gamemon")
+});
+
+pub static GAMEMON_CONFIG_FILE: Lazy<PathBuf> = Lazy::new(|| {
+    GAMEMON_CONFIG_DIR.join("config.toml")
+});
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct Config {
     pub entries: Vec<Entry>,
 }
@@ -29,11 +104,18 @@ impl Default for Entry {
 
 impl Config {
     // Use TOML to load the configuration from a file
-    pub fn load_from_file(file_path: &str) -> Result<Self, Box<dyn std::error::Error + Send>> {
+    pub fn load_from_file(file_path: &str) -> Result<Self, Box<dyn Error + Send>> {
         let data = fs::read_to_string(file_path)
-            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?;
+            .map_err(|e| Box::new(e) as Box<dyn Error + Send>)?;
+
+        if data.trim().is_empty() {
+            println!("Config file is empty. Initializing a new empty config.");
+            return Ok(Config::default());
+        }
+
         let config: Config = toml::from_str(&data)
-            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?;
+            .map_err(|e| Box::new(e) as Box<dyn Error + Send>)?;
+        
         Ok(config)
     }
 
@@ -43,32 +125,32 @@ impl Config {
         fs::write(file_path, data)?;
         Ok(())
     }
+}
 
-    // Checks if config.toml exists in the current directory. If not, creates it.
-    pub fn get_config_path() -> Result<String, Box<dyn Error>> {
-        
-        //Define config directory
-        let config_dir = dirs::config_dir().unwrap().join("gamemon"); 
+pub fn ensure_paths_exist() -> io::Result<()> {
+    let paths_to_create = [
+        &*GAMEMON_DIR,
+        &*GAMEMON_RESOURCE_DIR,
+        &*GAMEMON_CONFIG_DIR,
+    ];
 
-        // Check if directory exists, if not, create it
-        if !config_dir.exists() {
-            match std::fs::create_dir(&config_dir){
-                Ok(_) => println!("Configuration directory created successfully!"),
-                Err(e) => println!("Error creating configuration directory: {:?}", e),
-            }
-        };
-
-        // Define the config file path
-        let config_file = config_dir.join("config.toml");
-
-        // Check if the file exists
-        if !config_file.exists() {
-            // If the file doesn't exist, create it with an empty config
-            let default_config = Config { entries: Vec::new() };
-            default_config.save_to_file(config_file.to_str().unwrap())?;
+    for path in paths_to_create {
+        if !path.exists() {
+            println!("Creating directory: {}", path.display());
+            fs::create_dir_all(path)?;
         }
-
-        // Return the file path as a string
-        Ok(config_file.to_str().unwrap().to_string())
     }
+
+    let files_to_create = [
+        &*GAMEMON_CONFIG_FILE
+    ];
+
+    for file in files_to_create {
+        if !file.exists() {
+            println!("Creating empty file: {}", file.display());
+            fs::File::create(file)?;
+        }
+    }
+
+    Ok(())
 }

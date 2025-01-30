@@ -2,18 +2,11 @@ use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, RefreshKind, System, Update
 use std::{process::Command, sync::{mpsc, Arc}, thread};
 use std::time::Duration;
 use crate::config::Config;
-// use notify_rust::Notification;
 use dashmap::DashMap;
+use crate::config::{GAMEMON_CONFIG_FILE, GAMEMON_UPDATER};
 
 pub fn watchdog() -> Result<(), Box<dyn std::error::Error + Send>> {
     println!("Starting watchdog...");
-
-    // // Set the environment variables
-    // std::env::set_var("DISPLAY", ":0");
-    // std::env::set_var("DBUS_SESSION_BUS_ADDRESS", "unix:path=/run/user/1000/bus");
-
-    // Send an initial notification
-    // send_notification("GameMon", "GameMon is running.", 5000)?;
 
     // Keep track of active processes using DashMap with a sender to notify monitor threads
     let active_processes: Arc<DashMap<String, Option<mpsc::Sender<()>>>> = Arc::new(DashMap::new());
@@ -27,13 +20,14 @@ pub fn watchdog() -> Result<(), Box<dyn std::error::Error + Send>> {
     loop {
         if update_timer >= 600 {
             //run updater every 10 minutes
-            let _child = std::process::Command::new("./GameMon-update")
-            .spawn();
+            let _child = std::process::Command::new(GAMEMON_UPDATER.as_path())
+            .spawn()
+            .expect("Failed to start updater");
             update_timer = 0;
         }
         
         // Reload configuration on each check
-        let config_path = &*Config::get_config_path().unwrap();
+        let config_path = &GAMEMON_CONFIG_FILE.to_string_lossy();
         let config = Config::load_from_file(config_path)?;
         let entries = config.entries;
     
@@ -55,8 +49,6 @@ pub fn watchdog() -> Result<(), Box<dyn std::error::Error + Send>> {
                 if !active_processes.contains_key(&entry.executable) {
                     // If not monitored, create a new channel and monitoring thread
                     println!("Detected process '{}' with PID {}", entry.executable, pid);
-    
-                    // send_notification("GameMon", &format!("Detected process '{}' with PID {}", entry.executable, pid), 5000)?;
     
                     let (tx, rx) = mpsc::channel();
                     active_processes.insert(entry.executable.clone(), Some(tx)); // Persist the sender
@@ -144,29 +136,28 @@ fn monitor_process(
 fn run_commands(commands: &[String]) -> Result<(), Box<dyn std::error::Error + Send>> {
     for cmd in commands {
         println!("Running command: {}", cmd);
-        // send_notification("GameMon", &format!("Running command: {}", cmd), 5000)?;
 
-        if let Err(err) = Command::new("sh")
-            .arg("-c")
-            .arg(cmd)
-            .spawn()
-            .and_then(|mut child| child.wait())
-        {
-            eprintln!("Failed to execute command '{}': {}", cmd, err);
-            // send_notification("GameMon", &format!("Failed to execute command '{}': {}", cmd, err), 5000)?;
+        let cmd_string = cmd.to_string(); // Ensure `cmd` is owned, not borrowed
+
+        
+
+        if cfg!(target_os = "windows") {
+            // On Windows, use "cmd"
+            let mut command = Command::new("cmd"); // Default to "cmd" for Windows
+            command.arg("/C").arg(cmd_string);
+            if let Err(err) = command.spawn().and_then(|mut child| child.wait()) {
+                eprintln!("Failed to execute command '{}': {}", cmd, err);
+            };
+        } else {
+            // On Linux, use "sh -c"
+            let mut command = Command::new("sh"); // Default to "sh" for Linux
+            command.arg("-c").arg(cmd_string);
+            if let Err(err) = command.spawn().and_then(|mut child| child.wait()) {
+                eprintln!("Failed to execute command '{}': {}", cmd, err);
+            };
         }
+
+        
     }
     Ok(())
 }
-
-// // Helper function for sending notifications
-// fn send_notification(summary: &str, body: &str, timeout: u64) -> Result<(), Box<dyn std::error::Error + Send>> {
-//     Notification::new()
-//         .summary(summary)
-//         .body(body)
-//         .icon("dialog-information")
-//         .timeout(notify_rust::Timeout::Milliseconds(timeout as u32))
-//         .show()
-//         .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?;
-//     Ok(())
-// }

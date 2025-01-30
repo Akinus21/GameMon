@@ -1,20 +1,21 @@
-use std::env;
 use GameMon::app::Gui;
 use iced::settings::Settings;
 use iced::window::settings::Settings as Win_Settings;
+use GameMon::config::{GAMEMON_ICON, GAMEMON_UPDATER, GAMEMON_CONFIG_FILE, GAMEMON_LOGO};
 
 
 pub fn main() -> iced::Result {
 
     //run updater
-    let _child = std::process::Command::new("./GameMon-update")
-        .spawn();
+    let _child = std::process::Command::new(GAMEMON_UPDATER.as_path())
+        .spawn()
+        .expect("Failed to start updater");
 
     // Start the GUI application
-    let gamemon_icon_path = env::current_dir().unwrap().join("resources/gamemon.png");
-    let gamemon_icon = iced::window::icon::from_file(&gamemon_icon_path).unwrap();
+    let gamemon_icon = iced::window::icon::from_file(GAMEMON_LOGO.as_path()).unwrap();
   
-    println!("DEBUG: Icon at {:?}", &gamemon_icon_path);
+    println!("DEBUG: Icon at {:?}", gamemon_icon);
+
     iced::application("GameMon", Gui::update, Gui::view).theme(Gui::theme)
         .settings(Settings {
             id: Some("GameMon".to_string()),

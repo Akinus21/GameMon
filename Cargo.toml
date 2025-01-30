@@ -1,12 +1,16 @@
 [package]
 name = "GameMon"
-version = "0.4.1"
+version = "0.5.0"
 description = "Gaming Monitor"
 authors = ["Akinus21"]
 license = ""
 repository = ""
 edition = "2021"
 rust-version = "1.84.0"
+build = "build.rs"
+
+[target.x86_64-pc-windows-msvc]
+linker = "rust-lld"
 
 [[bin]]
 name = "GameMon-gui"
@@ -47,4 +51,11 @@ flate2 = "1.0.35"
 tar = "0.4.43"
 native-dialog = "0.7.0"
 ksni = { version = "0.3", default-features = false, features = ["async-io"] }
+once_cell = "1.20.2"
 libappindicator = "0.9.0"
+tray-item = { version = "0.10.0", features = ["ksni"]}
+zip = "2.2.2"
+
+[build-dependencies]
+embedinator = "0.1.0"
+embed-resource = "3.0.1"

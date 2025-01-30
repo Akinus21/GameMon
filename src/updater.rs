@@ -1,19 +1,41 @@
+use std::error::Error;
+use std::fs::File;
+use std::io::Write;
 use std::{env, fs, io};
-use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use notify_rust::Notification;
-use std::process::{Command, exit};
+use std::process::{exit, Command, Output, ExitStatus};
 use reqwest::blocking::Client;
 use serde_json;
 use native_dialog::{MessageDialog, MessageType};
 use serde_json::Value;
 use std::process::Command as ProcessCommand;
+use zip::read::ZipArchive;
+use GameMon::config::{GAMEMON_DIR
+    ,GAMEMON_CONFIG_DIR
+    ,GAMEMON_CONFIG_FILE
+    ,GAMEMON_EXECUTABLE
+    ,GAMEMON_GUI_EXECUTABLE
+    ,GAMEMON_RESOURCE_DIR
+    ,GAMEMON_UPDATER
+    ,GAMEMON_ICON
+    ,GAMEMON_BIN_DIR
+    ,ensure_paths_exist
+};
 
 pub fn main() {
-    let _ = update();
+    if !GAMEMON_DIR.as_path().exists(){
+        let _ = install();
+    } else {
+        let _ = update();
+    }
 }
 
 pub fn update() -> Result<(), Box<dyn std::error::Error>> {
+    if let Err(e) = ensure_paths_exist() {
+        eprintln!("Error ensuring paths exist: {}", e);
+    }
+
     // GitHub API URL for latest release
     let latest_release_url = "https://api.github.com/repos/Akinus21/GameMon/releases/latest";
 
@@ -36,20 +58,32 @@ pub fn update() -> Result<(), Box<dyn std::error::Error>> {
     // Compare versions
     if latest_version == current_version {
         println!("You are already on the latest version: {}", current_version);
-        if !is_service_running(){
-            let _start = match start_game_mon(){
-                Ok(_) => {
-                    println!("Restarted GameMon Successfully!")
-                }
-                Err(e) => {
-                    println!("Error restarting GameMon: {:?}", e)
-                }
-            };
+        #[cfg(unix)]
+        {
+            if !is_service_running(){
+                let _start = match start_game_mon(){
+                    Ok(_) => {
+                        println!("Restarted GameMon Successfully!")
+                    }
+                    Err(e) => {
+                        println!("Error restarting GameMon: {:?}", e)
+                    }
+                };
+            }
         }
         return Ok(()); // No update needed
     }
 
     println!("Update available! Current version: {}, Latest version: {}", current_version, latest_version);
+
+    // Detect the current platform (target OS and architecture)
+    let target_os = if cfg!(target_os = "linux") {
+        "linux"
+    } else if cfg!(target_os = "windows") {
+        "windows"
+    } else {
+        "unknown"
+    };
 
     // Show a Yes/No dialog to the user
     let result = MessageDialog::new()
@@ -58,18 +92,38 @@ pub fn update() -> Result<(), Box<dyn std::error::Error>> {
         .set_text(&format!("A new version ({}) is available. Do you want to update?", latest_version))
         .show_confirm();
 
-    // If user clicks "Yes", proceed with update
     if Some(result.unwrap()) == Some(true) {
-        // Extract download URL for the asset
-        let asset_url = response["assets"][0]["browser_download_url"]
-            .as_str()
-            .ok_or("No download URL found")?;
+        // Determine the correct asset URL for the current platform
+        let asset_url = match target_os {
+            "linux" => response["assets"]
+                .as_array()
+                .and_then(|assets| assets.iter().find(|a| a["name"].as_str().unwrap_or("").contains("linux")))
+                .and_then(|asset| asset["browser_download_url"].as_str())
+                .ok_or("No Linux download URL found")?,
+            "windows" => response["assets"]
+                .as_array()
+                .and_then(|assets| assets.iter().find(|a| a["name"].as_str().unwrap_or("").contains("windows")))
+                .and_then(|asset| asset["browser_download_url"].as_str())
+                .ok_or("No Windows download URL found")?,
+            _ => return Err("Unsupported platform".into()),
+        };
+
+        // Proceed to download the correct file based on the asset URL
+        println!("Downloading from: {}", asset_url);
 
         // Get system's temp directory from TMP environment variable
         let tmp_dir = env::var("TMP")
             .unwrap_or_else(|_| env::temp_dir().to_str().unwrap().to_string());
 
-        let tmp_archive_path = Path::new(&tmp_dir).join("GameMon-update.tar.gz");
+        let tmp_archive_path;
+        #[cfg(unix)]
+        {
+            tmp_archive_path = Path::new(&tmp_dir).join("GameMon-update.tar.gz");
+        }
+        #[cfg(windows)]
+        {
+            tmp_archive_path = Path::new(&tmp_dir).join("GameMon-update.zip");
+        }
 
         // Download the asset to the temp directory
         let mut resp = client.get(asset_url).send()?;
@@ -85,11 +139,29 @@ pub fn update() -> Result<(), Box<dyn std::error::Error>> {
 
         // Set permissions on the new file (Linux only)
         #[cfg(unix)]
+        {
+        use std::os::unix::fs::PermissionsExt;
         fs::set_permissions(&tmp_archive_path, fs::Permissions::from_mode(0o755))?;
+        }
 
         // Extract the downloaded archive
-        let tmp_extract_dir = Path::new(&tmp_dir).join("GameMon_update");
-        extract_tar_gz(&tmp_archive_path, &tmp_extract_dir)?;
+        let tmp_extract_dir;
+        // Set permissions on the new file (Linux only)
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&tmp_archive_path, fs::Permissions::from_mode(0o755))?;
+            // Extract the downloaded archive
+            tmp_extract_dir = Path::new(&tmp_dir).join("GameMon_update");
+            extract_tar_gz(&tmp_archive_path, &tmp_extract_dir)?;
+        }
+
+        #[cfg(windows)]
+        {
+            // Extract the downloaded archive
+            tmp_extract_dir = Path::new(&tmp_dir).join("GameMon_update");
+            extract_zip(&tmp_archive_path, &tmp_extract_dir)?;
+        }
 
         // Replace the current executable  
 
@@ -99,73 +171,46 @@ pub fn update() -> Result<(), Box<dyn std::error::Error>> {
 
         // Then replace
 
-        let result = if cfg!(target_os = "linux") {
-            let appdata_path = dirs::data_dir()
-                .unwrap_or_else(|| std::path::PathBuf::from("~/.local/share"))
-                .join("gamemon");
-            let new_exe = tmp_extract_dir.join("GameMon");
-            let new_gui= tmp_extract_dir.join("GameMon-gui");
-            let new_updater= tmp_extract_dir.join("GameMon-update");
-            let curr_exe = appdata_path.join("GameMon");
-            let curr_gui = appdata_path.join("GameMon-gui");
-            let curr_updater = appdata_path.join("GameMon-update_tmp");
-            let new_icon = tmp_extract_dir.join("resources/gamemon.png");
-            let curr_icon = appdata_path.join("resources/gamemon.png");
-            println!("Replacing GUI binary with new version...");
-            fs::copy(new_gui, curr_gui)?;
-            println!("Replacing GameMon binary with new version...");
-            fs::copy(new_exe, curr_exe)?;
-            println!("Replacing GameMon updater binary with new version...");
-            fs::copy(new_updater, curr_updater)?;
-            println!("Copying resources...");
-            fs::copy(new_icon, curr_icon)
+        let (new_exe, new_gui, new_updater, new_icon);
 
+        if cfg!(target_os = "linux") {
+            new_exe = tmp_extract_dir.join("GameMon");
+            new_gui = tmp_extract_dir.join("GameMon-gui");
+            new_updater = tmp_extract_dir.join("GameMon-update");
+            new_icon = tmp_extract_dir.join("resources/gamemon.png");
         } else if cfg!(target_os = "windows") {
-            let appdata = env::var("APPDATA").unwrap_or_else(|_| {
-                eprintln!("Failed to get APPDATA environment variable. Using default path.");
-                String::from("C:\\Users\\Default\\AppData\\Roaming")
-            });
-            let appdata_path = Path::new(&appdata);
-            let new_exe = tmp_extract_dir.join("GameMon.exe");
-            let new_gui= tmp_extract_dir.join("GameMon-gui.exe");
-            let new_updater= tmp_extract_dir.join("GameMon-update.exe");
-            let curr_exe = appdata_path.join("GameMon.exe");
-            let curr_gui = appdata_path.join("GameMon-gui.exe");
-            let curr_updater = appdata_path.join("GameMon-update_tmp.exe");
-            let new_icon = tmp_extract_dir.join("resources/gamemon.png");
-            let curr_icon = appdata_path.join("resources/gamemon.png");            
-            println!("Replacing GUI binary with new version...");
-            fs::copy(new_gui, curr_gui)?;
-            println!("Replacing GameMon binary with new version...");
-            fs::copy(new_exe, curr_exe)?;
-            println!("Replacing GameMon updater binary with new version...");
-            fs::copy(new_updater, curr_updater)?;
-            println!("Copying resources...");
-            fs::copy(new_icon, curr_icon)
-
-
+            new_exe = tmp_extract_dir.join("GameMon.exe");
+            new_gui = tmp_extract_dir.join("GameMon-gui.exe");
+            new_updater = tmp_extract_dir.join("GameMon-update.exe");
+            new_icon = tmp_extract_dir.join("resources\\gamemon.png");
         } else {
-            Err(io::Error::new(io::ErrorKind::Other, "Unsupported OS").into())
-        };
-    
-        let _replace = match result {
-            Ok(_) => {
-                println!("Executables copied successfully.");
-                let _start = match start_game_mon(){
-                    Ok(_) => {
-                        println!("Restarted GameMon Successfully!")
-                    }
-                    Err(e) => {
-                        println!("Error restarting GameMon: {:?}", e)
-                    }
-                };
-                Ok(())
-            }
-            Err(e) => {
-                eprintln!("Failed to copy executable: {}", e);
-                Err(e)
-            }
-        };
+            panic!("Unsupported OS");
+        }
+
+        let errors = vec![
+            replace_binary(&new_gui, GAMEMON_GUI_EXECUTABLE.as_path(), "GUI"),
+            replace_binary(&new_exe, GAMEMON_EXECUTABLE.as_path(), "GameMon"),
+            replace_binary(&new_updater, GAMEMON_UPDATER.as_path(), "Updater"),
+            replace_binary(&new_icon, GAMEMON_ICON.as_path(), "Icon"),
+        ];
+
+        // Handle any failures
+        let failed_ops: Vec<_> = errors.into_iter().filter(|res| res.is_err()).collect();
+
+        if !failed_ops.is_empty() {
+            eprintln!("Some files failed to replace. Check error messages above.");
+            std::process::exit(1);
+        } else {
+            println!("All files replaced successfully!");
+            let _start = match start_game_mon(){
+                Ok(_) => {
+                    println!("Restarted GameMon Successfully!")
+                }
+                Err(e) => {
+                    println!("Error restarting GameMon: {:?}", e)
+                }
+            };
+        }
 
         // Notify the user that the update is complete
         let _result = MessageDialog::new()
@@ -173,6 +218,7 @@ pub fn update() -> Result<(), Box<dyn std::error::Error>> {
             .set_type(MessageType::Warning)
             .set_text(&format!("GameMon is updated!  Thank you so much!  Enjoy!"))
             .show_alert();
+
         #[cfg(unix)]
         {
             let _child = std::process::Command::new("mv")
@@ -180,20 +226,290 @@ pub fn update() -> Result<(), Box<dyn std::error::Error>> {
                 .arg("GameMon-update")
                 .spawn()?;
         }
+
+        #[cfg(windows)]
+        {
+            let _child = std::process::Command::new("cmd")
+                .args(&["/C", "move", "GameMon-update_tmp.exe", "GameMon-update.exe"])
+                .spawn()?;
+        }
         
     } else {
         println!("User chose not to update.");
     }
 
-    if !is_service_running(){
-        let _start = match start_game_mon(){
-            Ok(_) => {
-                println!("Restarted GameMon Successfully!")
-            }
-            Err(e) => {
-                println!("Error restarting GameMon: {:?}", e)
-            }
+    #[cfg(unix)]
+    {
+        if !is_service_running(){
+            let _start = match start_game_mon(){
+                Ok(_) => {
+                    println!("Restarted GameMon Successfully!")
+                }
+                Err(e) => {
+                    println!("Error restarting GameMon: {:?}", e)
+                }
+            };
+        }
+    }
+
+    Ok(())
+}
+
+pub fn install() -> Result<(), Box<dyn std::error::Error>> {
+    if let Err(e) = ensure_paths_exist() {
+        eprintln!("Error ensuring paths exist: {}", e);
+    }
+
+    // GitHub API URL for latest release
+    let latest_release_url = "https://api.github.com/repos/Akinus21/GameMon/releases/latest";
+
+    // Create HTTP client
+    let client = Client::new();
+    let response: Value = client
+        .get(latest_release_url)
+        .header("User-Agent", "GameMon-Updater")
+        .send()?
+        .json()?;
+
+    // Extract the version from the GitHub release
+    let latest_version = response["tag_name"]
+        .as_str()
+        .ok_or("No version found in release")?;
+
+    println!("Installing latest version: {}", latest_version);
+
+    // Show a Yes/No dialog to the user
+    let result = MessageDialog::new()
+        .set_title("Install?")
+        .set_type(MessageType::Info)
+        .set_text(&format!("GameMon is not installed on this machine.  Would you like to install? \nLatest version: {}", latest_version))
+        .show_confirm();
+
+    // If user clicks "Yes", proceed with update
+    if Some(result.unwrap()) == Some(true) {
+
+        // Detect the current platform (target OS and architecture)
+        let target_os = if cfg!(target_os = "linux") {
+            "linux"
+        } else if cfg!(target_os = "windows") {
+            "windows"
+        } else {
+            "unknown"
         };
+
+        // Determine the correct asset URL for the current platform
+        let asset_url = match target_os {
+            "linux" => response["assets"]
+                .as_array()
+                .and_then(|assets| assets.iter().find(|a| a["name"].as_str().unwrap_or("").contains("linux")))
+                .and_then(|asset| asset["browser_download_url"].as_str())
+                .ok_or("No Linux download URL found")?,
+            "windows" => response["assets"]
+                .as_array()
+                .and_then(|assets| assets.iter().find(|a| a["name"].as_str().unwrap_or("").contains("windows")))
+                .and_then(|asset| asset["browser_download_url"].as_str())
+                .ok_or("No Windows download URL found")?,
+            _ => return Err("Unsupported platform".into()),
+        };
+
+        // Proceed to download the correct file based on the asset URL
+        println!("Downloading from: {}", asset_url);
+
+        // Get system's temp directory from TMP environment variable
+        let tmp_dir = env::var("TMP")
+            .unwrap_or_else(|_| env::temp_dir().to_str().unwrap().to_string());
+
+        let tmp_archive_path;
+        #[cfg(unix)]
+        {
+            tmp_archive_path = Path::new(&tmp_dir).join("GameMon-update.tar.gz");
+        }
+        #[cfg(windows)]
+        {
+            tmp_archive_path = Path::new(&tmp_dir).join("GameMon-update.zip");
+        }
+
+        // Download the asset to the temp directory
+        let mut resp = client.get(asset_url).send()?;
+        let mut file = fs::File::create(&tmp_archive_path)?;
+        resp.copy_to(&mut file)?;
+
+        // Notify the user that download is complete
+        Notification::new()
+            .summary("GameMon Install")
+            .body("Download complete! Extracting update...")
+            .icon("notification")
+            .show()?;
+
+        let tmp_extract_dir;
+        // Set permissions on the new file (Linux only)
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&tmp_archive_path, fs::Permissions::from_mode(0o755))?;
+            // Extract the downloaded archive
+            tmp_extract_dir = Path::new(&tmp_dir).join("GameMon_update");
+            extract_tar_gz(&tmp_archive_path, &tmp_extract_dir)?;
+        }
+
+        #[cfg(windows)]
+        {
+            // Extract the downloaded archive
+            tmp_extract_dir = Path::new(&tmp_dir).join("GameMon_update");
+            extract_zip(&tmp_archive_path, &tmp_extract_dir)?;
+        }
+
+        // Replace the current executable  
+
+        // Stop all instances of GameMon first
+        println!("Stopping all GameMon processes...");
+        let _stop = stop_game_mon();
+
+        // Then replace
+
+        let (new_exe, new_gui, new_updater, new_icon, errors, new_bin);
+
+        if cfg!(target_os = "linux") {
+            new_exe = tmp_extract_dir.join("GameMon");
+            new_gui = tmp_extract_dir.join("GameMon-gui");
+            new_updater = tmp_extract_dir.join("GameMon-update");
+            new_icon = tmp_extract_dir.join("resources/gamemon.png");
+
+            errors = vec![
+                replace_binary(&new_gui, GAMEMON_GUI_EXECUTABLE.as_path(), "GUI"),
+                replace_binary(&new_exe, GAMEMON_EXECUTABLE.as_path(), "GameMon"),
+                replace_binary(&new_updater, GAMEMON_UPDATER.as_path(), "Updater"),
+                replace_binary(&new_icon, GAMEMON_ICON.as_path(), "Icon"),
+            ];
+        } else if cfg!(target_os = "windows") {
+            new_exe = tmp_extract_dir.join("GameMon.exe");
+            new_gui = tmp_extract_dir.join("GameMon-gui.exe");
+            new_updater = tmp_extract_dir.join("GameMon-update.exe");
+            new_icon = tmp_extract_dir.join("resources\\gamemon.png");
+            new_bin = tmp_extract_dir.join("resources\\bin");
+
+            errors = vec![
+                replace_binary(&new_gui, GAMEMON_GUI_EXECUTABLE.as_path(), "GUI"),
+                replace_binary(&new_exe, GAMEMON_EXECUTABLE.as_path(), "GameMon"),
+                replace_binary(&new_updater, GAMEMON_UPDATER.as_path(), "Updater"),
+                replace_binary(&new_icon, GAMEMON_ICON.as_path(), "Icon"),
+                copy_dir_recursive(&new_bin, GAMEMON_DIR.as_path())
+            ]
+
+        } else {
+            panic!("Unsupported OS");
+        }
+
+        // Handle any failures
+        let failed_ops: Vec<_> = errors.into_iter().filter(|res| res.is_err()).collect();
+
+        if !failed_ops.is_empty() {
+            eprintln!("Some files failed to install. Check error messages above.");
+            std::process::exit(1);
+        } else {
+            println!("All files installed successfully!");
+            let _start = match start_game_mon(){
+                Ok(_) => {
+                    println!("Started GameMon Successfully!")
+                }
+                Err(e) => {
+                    println!("Error starting GameMon: {:?}", e)
+                }
+            };
+        }
+
+        // Notify the user that the update is complete
+        let _result = MessageDialog::new()
+            .set_title("GameMon Install Complete!")
+            .set_type(MessageType::Warning)
+            .set_text(&format!("GameMon is installed!  Thank you so much!  Enjoy!"))
+            .show_alert();
+
+        #[cfg(unix)]
+        {
+            let _child = std::process::Command::new("mv")
+                .arg("GameMon-update_tmp")
+                .arg("GameMon-update")
+                .spawn()?;
+        }
+
+        #[cfg(windows)]
+        {
+            let _child = std::process::Command::new("cmd")
+                .args(&["/C", "move", "GameMon-update_tmp.exe", "GameMon-update.exe"])
+                .spawn()?;
+        }
+        
+    } else {
+        println!("User chose not to update.");
+    }
+
+    #[cfg(unix)]
+    {
+        if !is_service_running(){
+            let _start = match start_game_mon(){
+                Ok(_) => {
+                    println!("Started GameMon Successfully!")
+                }
+                Err(e) => {
+                    println!("Error Starting GameMon: {:?}", e)
+                }
+            };
+        }
+    }
+
+    Ok(())
+}
+
+fn replace_binary(src: &Path, dest: &Path, name: &str) -> io::Result<()> {
+    print!("Replacing {} binary... ", name);
+    io::stdout().flush().ok(); // Flush output for better user experience
+
+    // Ensure the destination directory exists
+    if let Some(parent) = dest.parent() {
+        if !parent.exists() {
+            println!("Destination directory does not exist, creating it...");
+            fs::create_dir_all(parent)?;
+        }
+    }
+
+    // Copy the file from source to destination
+    match fs::copy(src, dest) {
+        Ok(_) => {
+            println!("Success!");
+            Ok(())
+        }
+        Err(e) => {
+            eprintln!("Failed! Error: {}", e);
+            Err(e)
+        }
+    }
+}
+
+fn copy_dir_recursive(src: &Path, dest: &Path) -> io::Result<()> {
+    if !src.exists() || !src.is_dir() {
+        return Err(io::Error::new(io::ErrorKind::NotFound, "Source directory does not exist or is not a directory"));
+    }
+
+    // Create destination directory if it does not exist
+    if !dest.exists() {
+        fs::create_dir_all(dest)?;
+    }
+
+    // Iterate over each entry in the source directory
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let file_type = entry.file_type()?;
+        let src_path = entry.path();
+        let dest_path = dest.join(entry.file_name());
+
+        if file_type.is_dir() {
+            // Recursively copy subdirectory
+            copy_dir_recursive(&src_path, &dest_path)?;
+        } else {
+            // Copy individual file
+            fs::copy(&src_path, &dest_path)?;
+        }
     }
 
     Ok(())
@@ -214,6 +530,42 @@ fn extract_tar_gz(tar_gz_path: &Path, extract_to: &Path) -> Result<(), Box<dyn s
     archive.unpack(extract_to)?;
 
     println!("Extracted files to {:?}", extract_to);
+    Ok(())
+}
+
+fn extract_zip(zip_path: &Path, extract_to: &Path) -> Result<(), Box<dyn Error>> {
+    // Open the ZIP file
+    let file = File::open(zip_path)?;
+    let mut archive = ZipArchive::new(file)?;
+
+    // Create the extraction directory if it doesn't exist
+    if !extract_to.exists() {
+        fs::create_dir_all(extract_to)?;
+    }
+
+    // Extract each file in the ZIP archive
+    for i in 0..archive.len() {
+        let mut file = archive.by_index(i)?;
+        let out_path = extract_to.join(file.name());
+
+        if file.is_dir() {
+            // Create directories inside the output folder
+            fs::create_dir_all(&out_path)?;
+        } else {
+            // Create parent directory if needed
+            if let Some(parent) = out_path.parent() {
+                if !parent.exists() {
+                    fs::create_dir_all(parent)?;
+                }
+            }
+
+            // Write file contents
+            let mut outfile = File::create(&out_path)?;
+            io::copy(&mut file, &mut outfile)?;
+        }
+    }
+
+    println!("Extracted ZIP files to {:?}", extract_to);
     Ok(())
 }
 
@@ -289,31 +641,22 @@ fn stop_game_mon() -> Result<(), Box<dyn std::error::Error>> {
                 .arg("GameMon.exe") // Assuming executable is named "GameMon.exe"
                 .output()?;
 
+            // Check if the process was terminated successfully
             if !output.status.success() {
-                eprintln!("Failed to stop GameMon processes on attempt {}. taskkill output: {:?}", attempts + 1, output);
+                // Convert stderr to a string to check if it contains "not found"
+                let stderr_str = String::from_utf8_lossy(&output.stderr);
+
+                if stderr_str.contains("not found") {
+                    // If the process was not found, consider it "closed" and break out of the loop
+                    println!("GameMon.exe is not running. Proceeding as closed.");
+                    break;
+                } else {
+                    eprintln!("Failed to stop GameMon processes on attempt {}. taskkill output: {:?}", attempts + 1, output);
+                }
+            } else {
+                println!("Successfully stopped GameMon.exe.");
+                break;
             }
-
-            // Verify if any GameMon processes (not GameMon-gui) are still running
-            let check_output = ProcessCommand::new("tasklist")
-                .arg("/fi")
-                .arg("imagename eq GameMon.exe")
-                .output()?;
-
-            // Store the result of tasklist output to avoid temporary value dropping
-            let remaining_processes = String::from_utf8_lossy(&check_output.stdout);
-
-            // Filter out GameMon-gui by checking the task name
-            let remaining_processes: Vec<&str> = remaining_processes
-                .lines()
-                .filter(|&line| !line.contains("GameMon-gui.exe"))
-                .collect();
-
-            if remaining_processes.is_empty() {
-                println!("All instances of GameMon (excluding GameMon-gui) have been stopped.");
-                return Ok(());
-            }
-
-            eprintln!("Some GameMon instances are still running on attempt {}.", attempts + 1);
         }
 
         // Wait before retrying (optional, you can adjust the duration)
@@ -354,13 +697,14 @@ fn start_game_mon() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(windows)]
     {
         // Spawn the GameMon executable as a new process on Windows
-        let _child = std::process::Command::new("GameMon.exe")
+        let _child = std::process::Command::new(&*GAMEMON_EXECUTABLE)
             .spawn()?; // Spawn the process and detach it
         println!("GameMon started successfully.");
         Ok(())
     }
 }
 
+#[cfg(target_os = "linux")]
 fn check_service(program_name: &str) -> Result<bool, Box<dyn std::error::Error>> {
     let is_found = if cfg!(target_os = "linux") {
         // On Linux, we can use systemctl to list all services
@@ -387,15 +731,29 @@ fn check_service(program_name: &str) -> Result<bool, Box<dyn std::error::Error>>
     Ok(is_found)
 }
 
+#[cfg(target_os = "linux")]
 fn is_active(program_name: &str) -> Result<bool, Box<dyn std::error::Error>>{
+    use std::os::unix::process::ExitStatusExt;
     let active = if cfg!(target_os = "linux") {
         // On Linux, we can use systemctl to list all services
-        let output = Command::new("systemctl")
+        let check_output = match Command::new("systemctl")
             .arg("is-active")
             .arg(program_name)
-            .output().unwrap();
+            .output()
+        {
+            Ok(output) => output,
+            Err(e) => {
+                eprintln!("Failed to check service status for {}: {}", program_name, e);
+                Output {
+                    status: ExitStatus::from_raw(if cfg!(unix) { 1 } else { 0 }), // Unix uses 1, Windows default is 0
+                    stdout: Vec::new(),
+                    stderr: Vec::new(),
+                }
+            }
+        };
 
-        let output_str = String::from_utf8_lossy(&output.stdout);
+
+        let output_str = String::from_utf8_lossy(&check_output.stdout);
         output_str.eq("active")
     } else {
         false
@@ -404,11 +762,21 @@ fn is_active(program_name: &str) -> Result<bool, Box<dyn std::error::Error>>{
     Ok(active)
 }
 
+#[cfg(target_os = "linux")]
 fn is_service_running() -> bool {
+    use std::os::unix::process::ExitStatusExt;
     // Verify if any GameMon processes (not GameMon-gui) are still running
-    let check_output = ProcessCommand::new("pgrep")
-    .arg("GameMon")
-    .output().unwrap();
+    let check_output = match ProcessCommand::new("pgrep").arg("GameMon").output() {
+        Ok(output) => output,
+        Err(e) => {
+            eprintln!("Failed to execute pgrep: {}", e);
+            Output {
+                status: ExitStatus::from_raw(if cfg!(unix) { 1 } else { 0 }), // Unix uses 1, Windows default is 0
+                stdout: Vec::new(),
+                stderr: Vec::new(),
+            }
+        }
+    };
 
     // Store the result of from_utf8_lossy in a `let` binding to ensure it's not a temporary
     let remaining_processes = String::from_utf8_lossy(&check_output.stdout);

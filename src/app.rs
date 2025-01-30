@@ -20,6 +20,7 @@ use iced::{Theme, color};
 use iced::theme::Palette;
 use iced::Color;
 use crate::config;
+use crate::config::{GAMEMON_CONFIG_FILE, ensure_paths_exist};
 
 pub struct Gui {
     game_name_field: String,      // List of game names
@@ -34,11 +35,16 @@ pub struct Gui {
 
 impl Default for Gui{
     fn default() -> Self {
-        let config = config::Config::load_from_file(&*config::Config::get_config_path().unwrap()).unwrap();
+        if let Err(e) = ensure_paths_exist() {
+            eprintln!("Error ensuring paths exist: {}", e);
+        }
+        let config = config::Config::load_from_file(&GAMEMON_CONFIG_FILE.to_string_lossy()).unwrap();
         let mut game_names = Vec::new();
 
-        for entry in config.entries.clone() {
-            game_names.push(entry.game_name.clone());
+        if !config.entries.is_empty() {
+            for entry in config.entries.clone() {
+                game_names.push(entry.game_name.clone());
+            }
         }
 
         Self {
@@ -104,7 +110,7 @@ impl Gui {
                     self.save_current_entry();
                 }
                 
-                let config = config::Config::load_from_file(&*config::Config::get_config_path().unwrap()).unwrap();
+                let config = config::Config::load_from_file(&GAMEMON_CONFIG_FILE.to_string_lossy()).unwrap();
                 let selected_entry = config.entries.iter().find(|entry| entry.game_name == game_name).unwrap();
                 self.selected_game_entry = Some(selected_entry.clone());
 
@@ -128,10 +134,10 @@ impl Gui {
                 self.save_current_entry();
             }
             Message::RemoveEntry => {
-                let mut config = config::Config::load_from_file(&*config::Config::get_config_path().unwrap()).unwrap();
+                let mut config = config::Config::load_from_file(&GAMEMON_CONFIG_FILE.to_string_lossy()).unwrap();
                 if let Some(index) = config.entries.iter().position(|entry| entry.game_name == self.game_name_field){
                     config.entries.remove(index);
-                    config::Config::save_to_file(&config, &*config::Config::get_config_path().unwrap()).unwrap();
+                    config::Config::save_to_file(&config, &GAMEMON_CONFIG_FILE.to_string_lossy()).unwrap();
                 
                     self.game_name_field = "Enter game name...".to_string();
                     self.game_executable_field = "Enter game executable...".to_string();
@@ -274,7 +280,7 @@ impl Gui {
 
 
     pub fn save_current_entry(&mut self) {
-        let mut config = config::Config::load_from_file(&*config::Config::get_config_path().unwrap()).unwrap();
+        let mut config = config::Config::load_from_file(&GAMEMON_CONFIG_FILE.to_string_lossy()).unwrap();
         if let Some(index) = config.entries.iter().position(|entry| entry.game_name == self.game_name_field){
             
             println!("Entry already exists at index {}", index);
@@ -297,7 +303,7 @@ impl Gui {
 
             config.entries.push(new_entry);
         }
-        config::Config::save_to_file(&config, &*config::Config::get_config_path().unwrap()).unwrap();
+        config::Config::save_to_file(&config, &GAMEMON_CONFIG_FILE.to_string_lossy()).unwrap();
         self.game_names = config.entries.iter().map(|e| e.game_name.clone()).collect(); // Update game names
         self.entry_changed = false;
     }
