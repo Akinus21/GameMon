@@ -14,7 +14,7 @@ use zip::read::ZipArchive;
 use GameMon::config::{GAMEMON_DIR
     ,GAMEMON_CONFIG_DIR
     ,GAMEMON_CONFIG_FILE
-    ,GAMEMON_EXECUTABLE
+    ,GAMEMON_SERVICE_EXECUTABLE
     ,GAMEMON_GUI_EXECUTABLE
     ,GAMEMON_RESOURCE_DIR
     ,GAMEMON_UPDATER
@@ -24,6 +24,9 @@ use GameMon::config::{GAMEMON_DIR
 };
 
 pub fn main() {
+
+
+
     if !GAMEMON_DIR.as_path().exists(){
         let _ = install();
     } else {
@@ -171,45 +174,25 @@ pub fn update() -> Result<(), Box<dyn std::error::Error>> {
 
         // Then replace
 
-        let (new_exe, new_gui, new_updater, new_icon);
-
-        if cfg!(target_os = "linux") {
-            new_exe = tmp_extract_dir.join("GameMon");
-            new_gui = tmp_extract_dir.join("GameMon-gui");
-            new_updater = tmp_extract_dir.join("GameMon-update");
-            new_icon = tmp_extract_dir.join("resources/gamemon.png");
-        } else if cfg!(target_os = "windows") {
-            new_exe = tmp_extract_dir.join("GameMon.exe");
-            new_gui = tmp_extract_dir.join("GameMon-gui.exe");
-            new_updater = tmp_extract_dir.join("GameMon-update.exe");
-            new_icon = tmp_extract_dir.join("resources\\gamemon.png");
-        } else {
-            panic!("Unsupported OS");
-        }
-
-        let errors = vec![
-            replace_binary(&new_gui, GAMEMON_GUI_EXECUTABLE.as_path(), "GUI"),
-            replace_binary(&new_exe, GAMEMON_EXECUTABLE.as_path(), "GameMon"),
-            replace_binary(&new_updater, &GAMEMON_DIR.as_path().join("GameMon-update_tmp"), "Updater"),
-            replace_binary(&new_icon, GAMEMON_ICON.as_path(), "Icon"),
-        ];
-
         // Handle any failures
-        let failed_ops: Vec<_> = errors.into_iter().filter(|res| res.is_err()).collect();
+        let failed_ops = copy_dir_recursive(&tmp_extract_dir, GAMEMON_DIR.as_path());
 
-        if !failed_ops.is_empty() {
-            eprintln!("Some files failed to replace. Check error messages above.");
-            std::process::exit(1);
-        } else {
-            println!("All files replaced successfully!");
-            let _start = match start_game_mon(){
-                Ok(_) => {
-                    println!("Restarted GameMon Successfully!")
-                }
-                Err(e) => {
-                    println!("Error restarting GameMon: {:?}", e)
-                }
-            };
+        match failed_ops {
+            Ok(_) => {
+                println!("All files installed successfully!");
+                let _start = match start_game_mon(){
+                    Ok(_) => {
+                        println!("Started GameMon Successfully!")
+                    }
+                    Err(e) => {
+                        println!("Error starting GameMon: {:?}", e)
+                    }
+                };
+            },
+            Err(e) => {
+                eprintln!("Some files failed to install. Error: {:?}", e);
+                std::process::exit(1);
+            }
         }
 
         // Notify the user that the update is complete
@@ -367,55 +350,25 @@ pub fn install() -> Result<(), Box<dyn std::error::Error>> {
 
         // Then replace
 
-        let (new_exe, new_gui, new_updater, new_icon, errors, new_bin);
-
-        if cfg!(target_os = "linux") {
-            new_exe = tmp_extract_dir.join("GameMon");
-            new_gui = tmp_extract_dir.join("GameMon-gui");
-            new_updater = tmp_extract_dir.join("GameMon-update");
-            new_icon = tmp_extract_dir.join("resources/gamemon.png");
-
-            errors = vec![
-                replace_binary(&new_gui, GAMEMON_GUI_EXECUTABLE.as_path(), "GUI"),
-                replace_binary(&new_exe, GAMEMON_EXECUTABLE.as_path(), "GameMon"),
-                replace_binary(&new_updater, GAMEMON_UPDATER.as_path(), "Updater"),
-                replace_binary(&new_icon, GAMEMON_ICON.as_path(), "Icon"),
-            ];
-        } else if cfg!(target_os = "windows") {
-            new_exe = tmp_extract_dir.join("GameMon.exe");
-            new_gui = tmp_extract_dir.join("GameMon-gui.exe");
-            new_updater = tmp_extract_dir.join("GameMon-update.exe");
-            new_icon = tmp_extract_dir.join("resources\\gamemon.png");
-            new_bin = tmp_extract_dir.join("resources\\bin");
-
-            errors = vec![
-                replace_binary(&new_gui, GAMEMON_GUI_EXECUTABLE.as_path(), "GUI"),
-                replace_binary(&new_exe, GAMEMON_EXECUTABLE.as_path(), "GameMon"),
-                replace_binary(&new_updater, GAMEMON_UPDATER.as_path(), "Updater"),
-                replace_binary(&new_icon, GAMEMON_ICON.as_path(), "Icon"),
-                copy_dir_recursive(&new_bin, GAMEMON_DIR.as_path())
-            ]
-
-        } else {
-            panic!("Unsupported OS");
-        }
-
         // Handle any failures
-        let failed_ops: Vec<_> = errors.into_iter().filter(|res| res.is_err()).collect();
+        let failed_ops = copy_dir_recursive(&tmp_extract_dir, GAMEMON_DIR.as_path());
 
-        if !failed_ops.is_empty() {
-            eprintln!("Some files failed to install. Check error messages above.");
-            std::process::exit(1);
-        } else {
-            println!("All files installed successfully!");
-            let _start = match start_game_mon(){
-                Ok(_) => {
-                    println!("Started GameMon Successfully!")
-                }
-                Err(e) => {
-                    println!("Error starting GameMon: {:?}", e)
-                }
-            };
+        match failed_ops {
+            Ok(_) => {
+                println!("All files installed successfully!");
+                let _start = match start_game_mon(){
+                    Ok(_) => {
+                        println!("Started GameMon Successfully!")
+                    }
+                    Err(e) => {
+                        println!("Error starting GameMon: {:?}", e)
+                    }
+                };
+            },
+            Err(e) => {
+                eprintln!("Some files failed to install. Error: {:?}", e);
+                std::process::exit(1);
+            }
         }
 
         // Notify the user that the update is complete
@@ -461,42 +414,27 @@ pub fn install() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn replace_binary(src: &Path, dest: &Path, name: &str) -> io::Result<()> {
-    print!("Replacing {} binary... ", name);
-    io::stdout().flush().ok(); // Flush output for better user experience
-
-    // Ensure the destination directory exists
-    if let Some(parent) = dest.parent() {
-        if !parent.exists() {
-            println!("Destination directory does not exist, creating it...");
-            fs::create_dir_all(parent)?;
-        }
-    }
-
-    // Copy the file from source to destination
-    match fs::copy(src, dest) {
-        Ok(_) => {
-            println!("Success!");
-            Ok(())
-        }
-        Err(e) => {
-            eprintln!("Failed! Error: {}", e);
-            Err(e)
-        }
-    }
-}
-
 fn copy_dir_recursive(src: &Path, dest: &Path) -> io::Result<()> {
+    println!("Checking if source directory exists: {:?}", src);
+    
     if !src.exists() || !src.is_dir() {
-        return Err(io::Error::new(io::ErrorKind::NotFound, "Source directory does not exist or is not a directory"));
+        println!("Error: Source directory does not exist or is not a directory.");
+        return Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            "Source directory does not exist or is not a directory",
+        ));
     }
 
     // Create destination directory if it does not exist
     if !dest.exists() {
+        println!("Creating destination directory: {:?}", dest);
         fs::create_dir_all(dest)?;
+    } else {
+        println!("Found destination directory: {:?}", dest);
     }
 
     // Iterate over each entry in the source directory
+    println!("Reading directory contents: {:?}", src);
     for entry in fs::read_dir(src)? {
         let entry = entry?;
         let file_type = entry.file_type()?;
@@ -504,14 +442,31 @@ fn copy_dir_recursive(src: &Path, dest: &Path) -> io::Result<()> {
         let dest_path = dest.join(entry.file_name());
 
         if file_type.is_dir() {
+            println!("Entering subdirectory: {:?} -> {:?}", src_path, dest_path);
             // Recursively copy subdirectory
             copy_dir_recursive(&src_path, &dest_path)?;
         } else {
+            println!("Copying file: {:?} -> {:?}", src_path, dest_path);
             // Copy individual file
-            fs::copy(&src_path, &dest_path)?;
+            match fs::copy(&src_path, &dest_path) {
+                Ok(bytes_copied) => {
+                    println!(
+                        "Success: Copied {} bytes from {:?} to {:?}",
+                        bytes_copied, src_path, dest_path
+                    );
+                }
+                Err(e) => {
+                    println!(
+                        "Error: Failed to copy file {:?} -> {:?}: {}",
+                        src_path, dest_path, e
+                    );
+                    return Err(e);
+                }
+            }
         }
     }
 
+    println!("Finished copying directory: {:?}", src);
     Ok(())
 }
 
@@ -577,7 +532,7 @@ fn stop_game_mon() -> Result<(), Box<dyn std::error::Error>> {
         #[cfg(unix)]
         {
             // Check if GameMon is running as a service. Let the user know they will have to kill it manually then. 
-            for g in ["GameMon", "gamemon"]{
+            for g in ["GameMon-service", "gamemon-service"]{
                 if check_service(g).unwrap(){
                     if is_active(g).unwrap(){
                         let _result = MessageDialog::new()
@@ -590,72 +545,78 @@ fn stop_game_mon() -> Result<(), Box<dyn std::error::Error>> {
                 }  
             };
 
-            // Verify if any GameMon processes (not GameMon-gui) are still running
-            let check_output = ProcessCommand::new("pgrep")
-                .arg("GameMon")
-                .output()?;
+            let gamemon_strings = Vec::from(["GameMon-service", "GameMon-gui"]);
+            for gp in gamemon_strings {
+                // Verify if any GameMon processes are still running
+                let check_output = ProcessCommand::new("pgrep")
+                    .arg(gp)
+                    .output()?;
 
-            // Store the result of from_utf8_lossy in a `let` binding to ensure it's not a temporary
-            let remaining_processes = String::from_utf8_lossy(&check_output.stdout);
+                // Store the result of from_utf8_lossy in a `let` binding to ensure it's not a temporary
+                let remaining_processes = String::from_utf8_lossy(&check_output.stdout);
 
-            // Filter out GameMon-gui by excluding it from the list of processes
-            let mut remaining_processes: Vec<&str> = remaining_processes
-                .lines()
-                .collect();
+                // Filter out GameMon-gui by excluding it from the list of processes
+                let mut remaining_processes: Vec<&str> = remaining_processes
+                    .lines()
+                    .collect();
 
-            loop {
-                if !remaining_processes.is_empty() {
-                    let count = &remaining_processes.len() -1;
-                    let p = &remaining_processes[count];
-                    println!("Killing {:?}", &remaining_processes[count]);
-                    let _check_output = ProcessCommand::new("pkill")
-                        .arg(p)
-                        .output()?;
-                    remaining_processes.remove(count);
-    
+                loop {
+                    if !remaining_processes.is_empty() {
+                        let count = &remaining_processes.len() -1;
+                        let p = &remaining_processes[count];
+                        println!("Killing {:?}", &remaining_processes[count]);
+                        let _check_output = ProcessCommand::new("pkill")
+                            .arg(p)
+                            .output()?;
+                        remaining_processes.remove(count);
+        
+                    } else {
+                        break;
+                    }
+                }
+
+                if remaining_processes.is_empty() {
+                    println!("All instances of GameMon (including GameMon-gui) have been stopped.");
+                    return Ok(());
                 } else {
-                    break;
+                    for p in remaining_processes {
+                        let _check_output = ProcessCommand::new("pkill")
+                            .arg(p)
+                            .output()?;
+                    }
                 }
-            }
 
-            if remaining_processes.is_empty() {
-                println!("All instances of GameMon (including GameMon-gui) have been stopped.");
-                return Ok(());
-            } else {
-                for p in remaining_processes {
-                    let _check_output = ProcessCommand::new("pkill")
-                        .arg(p)
-                        .output()?;
-                }
+                eprintln!("Some GameMon instances are still running on attempt {}.", attempts + 1);
             }
-
-            eprintln!("Some GameMon instances are still running on attempt {}.", attempts + 1);
         }
 
         #[cfg(windows)]
         {
-            // On Windows, use `taskkill` to stop the processes, excluding GameMon-gui
-            let output = ProcessCommand::new("taskkill")
-                .arg("/f") // Force terminate
-                .arg("/im")
-                .arg("GameMon.exe") // Assuming executable is named "GameMon.exe"
-                .output()?;
+            let gamemon_strings = Vec::from(["GameMon-service", "GameMon-gui"]);
+            for gp in gamemon_strings {
+                // On Windows, use `taskkill` to stop the processes, excluding GameMon-gui
+                let output = ProcessCommand::new("taskkill")
+                    .arg("/f") // Force terminate
+                    .arg("/im")
+                    .arg(gp) // Assuming executable is named "GameMon.exe"
+                    .output()?;
 
-            // Check if the process was terminated successfully
-            if !output.status.success() {
-                // Convert stderr to a string to check if it contains "not found"
-                let stderr_str = String::from_utf8_lossy(&output.stderr);
+                // Check if the process was terminated successfully
+                if !output.status.success() {
+                    // Convert stderr to a string to check if it contains "not found"
+                    let stderr_str = String::from_utf8_lossy(&output.stderr);
 
-                if stderr_str.contains("not found") {
-                    // If the process was not found, consider it "closed" and break out of the loop
-                    println!("GameMon.exe is not running. Proceeding as closed.");
-                    break;
+                    if stderr_str.contains("not found") {
+                        // If the process was not found, consider it "closed" and break out of the loop
+                        println!("{:?} is not running. Proceeding as closed.", gp);
+                        break;
+                    } else {
+                        eprintln!("Failed to stop {:?} processes on attempt {}. taskkill output: {:?}", gp, attempts + 1, output);
+                    }
                 } else {
-                    eprintln!("Failed to stop GameMon processes on attempt {}. taskkill output: {:?}", attempts + 1, output);
+                    println!("Successfully stopped {:?}", gp);
+                    break;
                 }
-            } else {
-                println!("Successfully stopped GameMon.exe.");
-                break;
             }
         }
 
@@ -697,7 +658,7 @@ fn start_game_mon() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(windows)]
     {
         // Spawn the GameMon executable as a new process on Windows
-        let _child = std::process::Command::new(&*GAMEMON_EXECUTABLE)
+        let _child = std::process::Command::new(&*GAMEMON_SERVICE_EXECUTABLE)
             .spawn()?; // Spawn the process and detach it
         println!("GameMon started successfully.");
         Ok(())

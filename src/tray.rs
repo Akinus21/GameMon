@@ -193,7 +193,7 @@ pub fn spawn_tray(
 
         // let mut menu = TrayItemMenu::new();
 
-        for item in menu {
+        for item in menu_var {
             let sender = sender.clone(); // Clone the sender before using it in the closure
             let _ = tray.add_menu_item(&item.0.clone(), move || {
                 // Send the selected action through the sender

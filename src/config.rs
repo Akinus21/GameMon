@@ -10,6 +10,9 @@ use std::ffi::OsStr;
 use std::os::windows::process::CommandExt; // Needed for CREATE_NO_WINDOW
 
 #[cfg(windows)]
+use winapi::um::winbase::CREATE_NO_WINDOW;
+
+#[cfg(windows)]
 use std::os::windows::ffi::OsStrExt;
 
 pub static APP_NAME: Lazy<String> = Lazy::new(|| env!("CARGO_PKG_NAME").to_string());
@@ -55,11 +58,11 @@ pub static GAMEMON_BIN_DIR: Lazy<PathBuf> = Lazy::new(|| {
 });
 
 
-pub static GAMEMON_EXECUTABLE: Lazy<PathBuf> = Lazy::new(|| {
+pub static GAMEMON_SERVICE_EXECUTABLE: Lazy<PathBuf> = Lazy::new(|| {
     if cfg!(target_os = "windows") {
-        GAMEMON_DIR.join("GameMon.exe")
+        GAMEMON_DIR.join("GameMon-service.exe")
     } else {
-        GAMEMON_DIR.join("GameMon")
+        GAMEMON_DIR.join("GameMon-service")
     }
 });
 
