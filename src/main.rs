@@ -1,17 +1,13 @@
 
-use std::path::PathBuf;
-use std::process::{exit, Command, Stdio};
+use std::process::{exit, Command};
 use std::sync::mpsc;
 use std::{env, fs, thread};
 use std::time::Duration;
 use GameMon::config::{GAMEMON_BIN_DIR
-    , GAMEMON_CONFIG_DIR
-    , GAMEMON_CONFIG_FILE
     , GAMEMON_DIR
-    , GAMEMON_EXECUTABLE
     , GAMEMON_GUI_EXECUTABLE
     , GAMEMON_RESOURCE_DIR
-    , GAMEMON_UPDATER
+    , check_for_updates
 };
 use GameMon::service;
 use GameMon::tray;
@@ -26,20 +22,9 @@ use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
 
 pub fn main() {
     
-    #[cfg(unix)]
-    {
-        println!("Opening updater at {:?}", GAMEMON_UPDATER.as_path());
-        let _child = std::process::Command::new(GAMEMON_UPDATER.as_path())
-        .spawn()
-        .expect("Failed to start updater");
-    }
-
-    #[cfg(windows)]
-    {
-
-        let mut child = std::process::Command::new(GAMEMON_UPDATER.as_path());
-        child.creation_flags(CREATE_NO_WINDOW);
-        let _ = child.spawn().expect("Failed to start updater");
+    match check_for_updates() {
+        Ok(_) => println!("Check for updates complete!"),
+        Err(e) => eprintln!("Error checking for updates: {:?}\n", e),
     }
 
 
@@ -112,6 +97,7 @@ pub fn main() {
             ,"GameMon - A Gaming Monitor".to_string()
             ,GAMEMON_RESOURCE_DIR.as_path().join("gamemon.png")
             ,vec!(("Show GUI".to_string(), "show_gui".to_string())
+                        ,("Check for Updates".to_string(), "updates".to_string() )
                         ,("Quit".to_string(), "quit".to_string())
                     )
         );
@@ -148,6 +134,13 @@ pub fn main() {
                     "show_gui" => {
                         println!("Received Show GUI message from tray.");
                             show_gui();
+                    }
+                    "updates" => {
+                        println!("Received Check for Updates message from tray.");
+                        match check_for_updates() {
+                            Ok(_) => println!("Check for updates complete!"),
+                            Err(e) => eprintln!("Error checking for updates: {:?}\n", e),
+                        }
                     }
                     other => {
                         println!("Received message from tray: {}", other);

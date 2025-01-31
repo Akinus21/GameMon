@@ -9,14 +9,13 @@ use std::thread;
 use tray_item::TrayItem;
 use tray_icon::{TrayIconBuilder, menu::Menu};
 
-use crate::config::GAMEMON_ICON;
-use crate::config::GAMEMON_LOGO;
+use crate::config::{GAMEMON_ICON, GAMEMON_LOGO, APP_NAME};
 
 pub fn spawn_tray(
     sender: mpsc::Sender<String>,
     title: String,
     icon_path: PathBuf,
-    menu: Vec<(String, String)>, // Change &str to String for owned data
+    menu_var: Vec<(String, String)>, // Change &str to String for owned data
 ) {
     #[cfg(unix)]
     {
@@ -29,6 +28,9 @@ pub fn spawn_tray(
         // Wrap the sender in an Arc<Mutex<>> to make it thread-safe and shareable
         let sender = Arc::new(Mutex::new(sender));
 
+        // Clone `menu` so it moves into the closure
+        let menu_clone = menu_var.clone(); 
+
         application.connect_activate(move |_| {
             // Build tray application
             let mut indicator = AppIndicator::new("Example", "applications-internet");
@@ -38,16 +40,28 @@ pub fn spawn_tray(
             println!("DEBUG: Icon at {:?}", icon);
             indicator.set_icon(icon);
 
+
             // Build menu
             let mut new_menu = gtk::Menu::new();
-            for item in menu.clone() { // Cloning the owned `menu` vector
+
+            // Add app name label
+            let app_name_item = gtk::MenuItem::with_label(&APP_NAME);
+            new_menu.append(&app_name_item);
+
+            // Add Separator
+            let separator = gtk::SeparatorMenuItem::new();
+            new_menu.append(&separator);
+
+
+            // Add items from function call 
+            for item in menu_clone.clone() { // Cloning the owned `menu` vector
                 let mi = gtk::MenuItem::with_label(&item.0);
                 // Clone the Arc<Mutex<Sender>> for the closure
                 let sender_clone = Arc::clone(&sender);
                 mi.connect_activate(move |_| {
                     if let Ok(sender) = sender_clone.lock() {
                         sender
-                            .send(item.1.clone()) // Clone the String to send it
+                            .send(item.1.clone().to_string()) // Clone the String to send it
                             .expect("Failed to send message");
                     }
                 });

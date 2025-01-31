@@ -1,13 +1,18 @@
 use serde::{Serialize, Deserialize};
 use toml::ser;
+use std::process::Command;
 use std::{fs, io};
 use std::error::Error;
 use once_cell::sync::Lazy;
 use std::path::PathBuf;
 use std::ffi::OsStr;
+#[cfg(windows)]
+use std::os::windows::process::CommandExt; // Needed for CREATE_NO_WINDOW
 
 #[cfg(windows)]
 use std::os::windows::ffi::OsStrExt;
+
+pub static APP_NAME: Lazy<String> = Lazy::new(|| env!("CARGO_PKG_NAME").to_string());
 
 pub static GAMEMON_DIR: Lazy<PathBuf> = Lazy::new(|| {
     if cfg!(target_os = "windows") {
@@ -202,4 +207,25 @@ pub fn run_windows_cmd(cmd_input: &str) -> Result<(), Box<dyn std::error::Error>
     }
 
     Ok(())
+}
+
+pub fn check_for_updates() -> Result<(), Box<dyn Error>> {
+    println!("Checking for updates:\nOpening updater at {:?}", GAMEMON_UPDATER.as_path());
+    
+    #[cfg(unix)]
+    {
+        Command::new(GAMEMON_UPDATER.as_path())
+            .spawn()
+            .map(|_| ()) // Convert `Result<Child, io::Error>` to `Result<(), io::Error>`
+            .map_err(|e| Box::new(e) as Box<dyn Error>) // Convert to `Box<dyn Error>`
+    }
+
+    #[cfg(windows)]
+    {
+        let mut child = Command::new(GAMEMON_UPDATER.as_path());
+        child.creation_flags(CREATE_NO_WINDOW);
+        child.spawn()
+            .map(|_| ()) // Convert `Result<Child, io::Error>` to `Result<(), io::Error>`
+            .map_err(|e| Box::new(e) as Box<dyn Error>) // Convert to `Box<dyn Error>`
+    }
 }

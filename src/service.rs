@@ -3,7 +3,7 @@ use std::{process::{Command, Stdio}, sync::{mpsc, Arc}, thread};
 use std::time::Duration;
 use crate::config::{self, Config};
 use dashmap::DashMap;
-use crate::config::{GAMEMON_CONFIG_FILE, GAMEMON_UPDATER};
+use crate::config::{GAMEMON_CONFIG_FILE, GAMEMON_UPDATER, check_for_updates};
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 
@@ -23,23 +23,11 @@ pub fn watchdog() -> Result<(), Box<dyn std::error::Error + Send>> {
         if update_timer >= 600 {
             //run updater every 10 minutes
 
-            #[cfg(unix)]
-            {
-                let _child = std::process::Command::new(GAMEMON_UPDATER.as_path())
-                .spawn()
-                .expect("Failed to start updater");
-                update_timer = 0;
+            match check_for_updates() {
+                Ok(_) => println!("Check for updates complete!"),
+                Err(e) => eprintln!("Error checking for updates: {:?}\n", e),
             }
-
-            #[cfg(windows)]
-            {
-                match config::run_windows_cmd(&*GAMEMON_UPDATER.to_string_lossy()) {
-                    Ok(_) => println!("Updater executed successfully"),
-                    Err(e) => eprintln!("Failed to execute updater: {:?}", e),
-                }
-                update_timer = 0;
-            }
-
+            update_timer = 0;
 
         }
         
