@@ -190,7 +190,7 @@ pub fn update() -> Result<(), Box<dyn std::error::Error>> {
         let errors = vec![
             replace_binary(&new_gui, GAMEMON_GUI_EXECUTABLE.as_path(), "GUI"),
             replace_binary(&new_exe, GAMEMON_EXECUTABLE.as_path(), "GameMon"),
-            replace_binary(&new_updater, GAMEMON_UPDATER.as_path(), "Updater"),
+            replace_binary(&new_updater, &GAMEMON_DIR.as_path().join("GameMon-update_tmp"), "Updater"),
             replace_binary(&new_icon, GAMEMON_ICON.as_path(), "Icon"),
         ];
 

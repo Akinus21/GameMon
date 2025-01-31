@@ -1,9 +1,11 @@
 use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, RefreshKind, System, UpdateKind};
 use std::{process::{Command, Stdio}, sync::{mpsc, Arc}, thread};
 use std::time::Duration;
-use crate::config::Config;
+use crate::config::{self, Config};
 use dashmap::DashMap;
 use crate::config::{GAMEMON_CONFIG_FILE, GAMEMON_UPDATER};
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 
 pub fn watchdog() -> Result<(), Box<dyn std::error::Error + Send>> {
     println!("Starting watchdog...");
@@ -31,15 +33,11 @@ pub fn watchdog() -> Result<(), Box<dyn std::error::Error + Send>> {
 
             #[cfg(windows)]
             {
-                let _child = std::process::Command::new("cmd")
-                .arg("/c")
-                .arg("start")
-                .arg("")
-                .arg(GAMEMON_UPDATER.as_path())
-                .stdout(Stdio::null()) // Suppress console output
-                .stderr(Stdio::null())
-                .spawn()
-                .expect("Failed to start updater");
+                match config::run_windows_cmd(&*GAMEMON_UPDATER.to_string_lossy()) {
+                    Ok(_) => println!("Updater executed successfully"),
+                    Err(e) => eprintln!("Failed to execute updater: {:?}", e),
+                }
+                update_timer = 0;
             }
 
 
@@ -159,15 +157,18 @@ fn run_commands(commands: &[String]) -> Result<(), Box<dyn std::error::Error + S
         let cmd_string = cmd.to_string(); // Ensure `cmd` is owned, not borrowed
 
         
-
-        if cfg!(target_os = "windows") {
+        #[cfg(windows)]
+        {
             // On Windows, use "cmd"
-            let mut command = Command::new("cmd"); // Default to "cmd" for Windows
-            command.arg("/C").arg(cmd_string);
-            if let Err(err) = command.spawn().and_then(|mut child| child.wait()) {
-                eprintln!("Failed to execute command '{}': {}", cmd, err);
-            };
-        } else {
+
+            match config::run_windows_cmd(&cmd_string) {
+                Ok(_) => println!("{:?} executed successfully", &cmd_string),
+                Err(e) => eprintln!("Failed to execute command '{}': {}", &cmd_string, e),
+            }
+        }
+
+        #[cfg(unix)]
+        {
             // On Linux, use "sh -c"
             let mut command = Command::new("sh"); // Default to "sh" for Linux
             command.arg("-c").arg(cmd_string);
@@ -175,8 +176,6 @@ fn run_commands(commands: &[String]) -> Result<(), Box<dyn std::error::Error + S
                 eprintln!("Failed to execute command '{}': {}", cmd, err);
             };
         }
-
-        
     }
     Ok(())
 }

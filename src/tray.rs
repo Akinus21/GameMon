@@ -18,7 +18,8 @@ pub fn spawn_tray(
     icon_path: PathBuf,
     menu: Vec<(String, String)>, // Change &str to String for owned data
 ) {
-    if cfg!(target_os = "linux") || cfg!(target_os = "macos") {
+    #[cfg(unix)]
+    {
         // Linux/macOS solution using GTK and AppIndicator
         let application = gtk::Application::new(
             Some("com.example.trayapp"),
@@ -58,7 +59,10 @@ pub fn spawn_tray(
         });
 
         application.run();
-    } else if cfg!(target_os = "windows") {
+    }
+
+    #[cfg(target_os = "windows")]
+    {
         // Windows solution using tray-item crate
         use winresource::WindowsResource;
         use image::GenericImageView;

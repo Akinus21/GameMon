@@ -15,12 +15,33 @@ use GameMon::config::{GAMEMON_BIN_DIR
 };
 use GameMon::service;
 use GameMon::tray;
+#[cfg(windows)]
+use GameMon::config;
+
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
+#[cfg(windows)]
+use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
 
 pub fn main() {
     
-    let _child = std::process::Command::new(GAMEMON_UPDATER.as_path())
+    #[cfg(unix)]
+    {
+        println!("Opening updater at {:?}", GAMEMON_UPDATER.as_path());
+        let _child = std::process::Command::new(GAMEMON_UPDATER.as_path())
         .spawn()
         .expect("Failed to start updater");
+    }
+
+    #[cfg(windows)]
+    {
+
+        let mut child = std::process::Command::new(GAMEMON_UPDATER.as_path());
+        child.creation_flags(CREATE_NO_WINDOW);
+        let _ = child.spawn().expect("Failed to start updater");
+    }
+
 
     // Check if the gamemon directory exists.  If not, create it.
     if !GAMEMON_DIR.as_path().exists() {
@@ -90,8 +111,8 @@ pub fn main() {
         tray::spawn_tray(ttx.clone()
             ,"GameMon - A Gaming Monitor".to_string()
             ,GAMEMON_RESOURCE_DIR.as_path().join("gamemon.png")
-            ,vec!(("show_gui".to_string(), "show_gui".to_string())
-                        ,("quit".to_string(), "quit".to_string())
+            ,vec!(("Show GUI".to_string(), "show_gui".to_string())
+                        ,("Quit".to_string(), "quit".to_string())
                     )
         );
         gtk::main(); // Keep GTK running in the tray thread
@@ -179,45 +200,9 @@ pub fn show_gui() {
 
     #[cfg(windows)]
     {
-
-        use std::ptr;
-        use winapi::um::shellapi::ShellExecuteW;
-        use winapi::um::winuser::SW_HIDE;
-        use winapi::um::winnt::LPCWSTR;
-        use std::ffi::OsStr;
-        use std::os::windows::ffi::OsStrExt;
-
-        fn to_wide_null(s: &str) -> Vec<u16> {
-            OsStr::new(s).encode_wide().chain(Some(0)).collect()
-        }
-
-        // let mut cmd = Command::new("cmd")
-        //     .arg("/c")
-        //     .arg("start")
-        //     .arg("")
-        //     .arg(&gui_path_str)
-        //     .stdout(Stdio::null()) // Suppress console output
-        //     .stderr(Stdio::null());
-
-        // match cmd.spawn() {
-        //     Ok(_child) => println!("Successfully spawned GameMon-gui."),
-        //     Err(e) => {
-        //         eprintln!("Failed to spawn GameMon-gui: {}", e);
-        //         std::process::exit(1);
-        //     }
-        // }
-
-        let path = to_wide_null(&gui_path_str);
-
-        unsafe {
-            ShellExecuteW(
-                ptr::null_mut(),
-                to_wide_null("open").as_ptr() as LPCWSTR,
-                path.as_ptr() as LPCWSTR,
-                ptr::null(),
-                ptr::null(),
-                SW_HIDE, // Ensures no console window appears
-            );
+        match config::run_windows_cmd(&gui_path_str) {
+            Ok(_) => println!("{:?} executed successfully", &gui_path_str),
+            Err(e) => eprintln!("Failed to execute command '{}': {}", &gui_path_str, e),
         }
     }
 }

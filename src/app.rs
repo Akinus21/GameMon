@@ -1,6 +1,5 @@
 use iced::alignment::Horizontal::{Left, Center as xCenter};
 use iced::alignment::Vertical::Bottom;
-use iced::widget::container::background;
 use iced::widget::{
     button,
     column,
@@ -16,7 +15,7 @@ use iced::widget::{
     horizontal_space,
 };
 use iced::Length::Fill;
-use iced::{Theme, color};
+use iced::Theme;
 use iced::theme::Palette;
 use iced::Color;
 use crate::config;

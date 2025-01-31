@@ -4,6 +4,10 @@ use std::{fs, io};
 use std::error::Error;
 use once_cell::sync::Lazy;
 use std::path::PathBuf;
+use std::ffi::OsStr;
+
+#[cfg(windows)]
+use std::os::windows::ffi::OsStrExt;
 
 pub static GAMEMON_DIR: Lazy<PathBuf> = Lazy::new(|| {
     if cfg!(target_os = "windows") {
@@ -149,6 +153,51 @@ pub fn ensure_paths_exist() -> io::Result<()> {
         if !file.exists() {
             println!("Creating empty file: {}", file.display());
             fs::File::create(file)?;
+        }
+    }
+
+    Ok(())
+}
+
+
+    
+#[cfg(windows)]
+use std::ptr;
+#[cfg(windows)]
+use winapi::um::shellapi::ShellExecuteW;
+#[cfg(windows)]
+use winapi::um::winuser::SW_HIDE;
+#[cfg(windows)]
+use winapi::um::winnt::LPCWSTR;
+#[cfg(windows)]
+// Convert a Rust string to a wide string (UTF-16) with a null terminator
+fn to_wide_null(s: &str) -> Vec<u16> {
+    OsStr::new(s).encode_wide().chain(Some(0)).collect()
+}
+
+#[cfg(windows)]
+pub fn run_windows_cmd(cmd_input: &str) -> Result<(), Box<dyn std::error::Error>> {
+
+    // Convert the gui_path_str to a wide null-terminated string
+    let path = to_wide_null(cmd_input);
+
+    unsafe {
+        // Call ShellExecuteW to run the command
+        let result = ShellExecuteW(
+            ptr::null_mut(),
+            to_wide_null("open").as_ptr() as LPCWSTR,
+            path.as_ptr() as LPCWSTR,
+            ptr::null(),
+            ptr::null(),
+            SW_HIDE, // Ensures no console window appears
+        );
+
+        // Check if the result is less than or equal to 32, indicating failure
+        if result as isize <= 32 {
+            return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Failed to execute the command",
+            )));
         }
     }
 
