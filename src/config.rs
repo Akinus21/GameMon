@@ -5,6 +5,7 @@ use std::{fs, io};
 use std::error::Error;
 use once_cell::sync::Lazy;
 use std::path::PathBuf;
+#[cfg(windows)]
 use std::ffi::OsStr;
 #[cfg(windows)]
 use std::os::windows::process::CommandExt; // Needed for CREATE_NO_WINDOW

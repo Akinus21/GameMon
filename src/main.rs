@@ -3,14 +3,14 @@ use std::process::{exit, Command};
 use std::sync::mpsc;
 use std::{env, fs, thread};
 use std::time::Duration;
-use GameMon::config::{GAMEMON_BIN_DIR
+use game_mon::config::{GAMEMON_BIN_DIR
     , GAMEMON_DIR
     , GAMEMON_GUI_EXECUTABLE
     , GAMEMON_RESOURCE_DIR
     , check_for_updates
 };
-use GameMon::service;
-use GameMon::tray;
+use game_mon::service;
+use game_mon::tray;
 #[cfg(windows)]
 use GameMon::config;
 

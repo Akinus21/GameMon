@@ -1,6 +1,7 @@
+#[cfg(windows)]
 use std::error::Error;
+#[cfg(windows)]
 use std::fs::File;
-use std::io::Write;
 use std::{env, fs, io};
 use std::path::Path;
 use notify_rust::Notification;
@@ -10,16 +11,9 @@ use serde_json;
 use native_dialog::{MessageDialog, MessageType};
 use serde_json::Value;
 use std::process::Command as ProcessCommand;
+#[cfg(windows)]
 use zip::read::ZipArchive;
-use GameMon::config::{GAMEMON_DIR
-    ,GAMEMON_CONFIG_DIR
-    ,GAMEMON_CONFIG_FILE
-    ,GAMEMON_SERVICE_EXECUTABLE
-    ,GAMEMON_GUI_EXECUTABLE
-    ,GAMEMON_RESOURCE_DIR
-    ,GAMEMON_UPDATER
-    ,GAMEMON_ICON
-    ,GAMEMON_BIN_DIR
+use game_mon::config::{GAMEMON_DIR
     ,ensure_paths_exist
 };
 
@@ -488,6 +482,7 @@ fn extract_tar_gz(tar_gz_path: &Path, extract_to: &Path) -> Result<(), Box<dyn s
     Ok(())
 }
 
+#[cfg(windows)]
 fn extract_zip(zip_path: &Path, extract_to: &Path) -> Result<(), Box<dyn Error>> {
     // Open the ZIP file
     let file = File::open(zip_path)?;

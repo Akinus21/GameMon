@@ -1,5 +1,5 @@
 [package]
-name = "GameMon"
+name = "game_mon"
 version = "0.5.2"
 description = "Gaming Monitor"
 authors = ["Akinus21"]

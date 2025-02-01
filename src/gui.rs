@@ -1,7 +1,7 @@
-use GameMon::app::Gui;
+use game_mon::app::Gui;
 use iced::settings::Settings;
 use iced::window::settings::Settings as Win_Settings;
-use GameMon::config::{GAMEMON_ICON, GAMEMON_UPDATER, GAMEMON_CONFIG_FILE, GAMEMON_LOGO, check_for_updates};
+use game_mon::config::{GAMEMON_LOGO, check_for_updates};
 
 
 pub fn main() -> iced::Result {

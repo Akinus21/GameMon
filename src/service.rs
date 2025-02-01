@@ -1,9 +1,9 @@
 use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, RefreshKind, System, UpdateKind};
-use std::{process::{Command, Stdio}, sync::{mpsc, Arc}, thread};
+use std::{process::Command, sync::{mpsc, Arc}, thread};
 use std::time::Duration;
-use crate::config::{self, Config};
+use crate::config::Config;
 use dashmap::DashMap;
-use crate::config::{GAMEMON_CONFIG_FILE, GAMEMON_UPDATER, check_for_updates};
+use crate::config::{GAMEMON_CONFIG_FILE, check_for_updates};
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 

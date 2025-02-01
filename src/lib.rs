@@ -1,4 +1,4 @@
-//! This crate provides the core functionality for GameMon,
+//! This crate provides the core functionality for game_mon,
 //! including the GUI, tray, configuration management, and service logic.
 
 // Declare the modules for the crate
