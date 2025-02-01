@@ -13,8 +13,10 @@ use serde_json::Value;
 use std::process::Command as ProcessCommand;
 #[cfg(windows)]
 use zip::read::ZipArchive;
-use game_mon::config::{GAMEMON_DIR
-    ,ensure_paths_exist
+use game_mon::config::
+{
+    GAMEMON_DIR,
+    ensure_paths_exist
 };
 
 pub fn main() {
