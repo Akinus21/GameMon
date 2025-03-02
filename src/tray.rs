@@ -44,7 +44,7 @@ pub fn spawn_tray(
             let mut new_menu = gtk::Menu::new();
 
             // Add app name label
-            let app_name_item = gtk::MenuItem::with_label(&APP_NAME);
+            let app_name_item = gtk::MenuItem::with_label("GameMon");
             new_menu.append(&app_name_item);
 
             // Add Separator

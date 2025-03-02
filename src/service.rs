@@ -89,7 +89,17 @@ pub fn watchdog() -> Result<(), Box<dyn std::error::Error + Send>> {
 // Get the PID for a given executable name
 fn get_pid_for_executable(executable: &str, sys: &System) -> Option<sysinfo::Pid> {
     sys.processes().iter().find_map(|(pid, proc)| {
-        if proc.name() == executable {
+        let process_name = proc.name().to_string_lossy().to_string();
+        let process_command = format!("{:?}", proc.cmd().get(0).unwrap_or(&std::ffi::OsString::new()));
+
+        if process_command.contains(executable){
+            println!("Matched on command: {}", process_command); 
+            Some(*pid)
+        } else if executable.contains(&process_name){
+            println!("Matched on name inside listed executable: {}", process_name);
+            Some(*pid)
+        } else if process_name.contains(executable){
+            println!("Matched on listed executable inside name: {}", process_name);  
             Some(*pid)
         } else {
             None
