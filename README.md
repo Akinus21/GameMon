@@ -41,5 +41,3 @@ GameMon is written in Rust. To build from source, you'll need to have a Rust dev
    ```bash
    cargo build --release
 The resulting executable will be found in the target/release directory.
-
-(… and so on for the remaining sections)
