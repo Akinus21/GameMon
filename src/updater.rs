@@ -320,7 +320,7 @@ pub fn install() -> Result<(), Box<dyn std::error::Error>> {
             .icon("notification")
             .show()?;
 
-        let tmp_extract_dir;
+        let mut tmp_extract_dir;
         // Set permissions on the new file (Linux only)
         #[cfg(unix)]
         {
@@ -345,6 +345,11 @@ pub fn install() -> Result<(), Box<dyn std::error::Error>> {
         let _stop = stop_game_mon();
 
         // Then replace
+        // The linux archives hold the files in the linux directory, so we need to copy from there
+        #[cfg(unix)]
+        {
+            tmp_extract_dir = Path::new(&tmp_extract_dir).join("linux");
+        }
 
         // Handle any failures
         let failed_ops = copy_dir_recursive(&tmp_extract_dir, GAMEMON_DIR.as_path());
