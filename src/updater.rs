@@ -329,6 +329,7 @@ pub fn install() -> Result<(), Box<dyn std::error::Error>> {
             // Extract the downloaded archive
             tmp_extract_dir = Path::new(&tmp_dir).join("GameMon_update");
             extract_tar_gz(&tmp_archive_path, &tmp_extract_dir)?;
+            tmp_extract_dir = Path::new(&tmp_extract_dir).join("linux");
         }
 
         #[cfg(windows)]
@@ -345,11 +346,6 @@ pub fn install() -> Result<(), Box<dyn std::error::Error>> {
         let _stop = stop_game_mon();
 
         // Then replace
-        // The linux archives hold the files in the linux directory, so we need to copy from there
-        #[cfg(unix)]
-        {
-            tmp_extract_dir = Path::new(&tmp_extract_dir).join("linux");
-        }
 
         // Handle any failures
         let failed_ops = copy_dir_recursive(&tmp_extract_dir, GAMEMON_DIR.as_path());
@@ -447,19 +443,19 @@ fn copy_dir_recursive(src: &Path, dest: &Path) -> io::Result<()> {
             // Recursively copy subdirectory
             copy_dir_recursive(&src_path, &dest_path)?;
         } else {
-            println!("Copying file: {:?} -> {:?}", src_path, dest_path);
+            println!("Copying file: {:?} -> {:?}", src_path, dest);
             // Copy individual file
-            match fs::copy(&src_path, &dest_path) {
+            match fs::copy(&src_path, &dest) {
                 Ok(bytes_copied) => {
                     println!(
                         "Success: Copied {} bytes from {:?} to {:?}",
-                        bytes_copied, src_path, dest_path
+                        bytes_copied, src_path, dest
                     );
                 }
                 Err(e) => {
                     println!(
                         "Error: Failed to copy file {:?} -> {:?}: {}",
-                        src_path, dest_path, e
+                        src_path, dest, e
                     );
                     return Err(e);
                 }

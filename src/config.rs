@@ -18,6 +18,8 @@ use std::os::windows::ffi::OsStrExt;
 
 pub static APP_NAME: Lazy<String> = Lazy::new(|| env!("CARGO_PKG_NAME").to_string());
 
+pub static CURRENT_VERSION: Lazy<String> = Lazy::new(|| env!("CARGO_PKG_VERSION").to_string());
+
 pub static GAMEMON_DIR: Lazy<PathBuf> = Lazy::new(|| {
     if cfg!(target_os = "windows") {
         dirs::data_dir().unwrap_or_else(|| PathBuf::from("C:\\Users\\Default\\AppData\\Roaming")).join("gamemon")

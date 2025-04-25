@@ -8,8 +8,7 @@ use std::sync::Mutex;
 #[cfg(windows)]
 use tray_item::TrayItem;
 
-
-use crate::config::APP_NAME;
+use crate::config::CURRENT_VERSION;
 
 pub fn spawn_tray(
     sender: mpsc::Sender<String>,
@@ -44,7 +43,8 @@ pub fn spawn_tray(
             let mut new_menu = gtk::Menu::new();
 
             // Add app name label
-            let app_name_item = gtk::MenuItem::with_label("GameMon");
+                // Get current version from the package's version defined in Cargo.toml
+            let app_name_item = gtk::MenuItem::with_label(&format!("GameMon v{}", CURRENT_VERSION.to_string()));
             new_menu.append(&app_name_item);
 
             // Add Separator

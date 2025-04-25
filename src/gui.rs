@@ -1,7 +1,7 @@
 use game_mon::app::Gui;
 use iced::settings::Settings;
 use iced::window::settings::Settings as Win_Settings;
-use game_mon::config::{GAMEMON_LOGO, check_for_updates};
+use game_mon::config::{GAMEMON_LOGO, check_for_updates, CURRENT_VERSION};
 
 
 pub fn main() -> iced::Result {
@@ -16,7 +16,10 @@ pub fn main() -> iced::Result {
   
     println!("DEBUG: Icon at {:?}", gamemon_icon);
 
-    iced::application("GameMon", Gui::update, Gui::view).theme(Gui::theme)
+    let window_title = format!("GameMon v{}", CURRENT_VERSION.to_string());
+    let window_title: &'static str = Box::leak(window_title.into_boxed_str());
+
+    iced::application(window_title, Gui::update, Gui::view).theme(Gui::theme)
         .settings(Settings {
             id: Some("GameMon".to_string()),
             ..Default::default()

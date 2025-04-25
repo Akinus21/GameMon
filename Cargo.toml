@@ -7,7 +7,7 @@ license = ""
 repository = ""
 edition = "2021"
 rust-version = "1.84.0"
-build = "build.rs"
+#build = "build.rs"
 
 [target.x86_64-pc-windows-msvc]
 linker = "rust-lld"
