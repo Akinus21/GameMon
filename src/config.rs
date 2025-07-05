@@ -124,7 +124,7 @@ impl Config {
             .map_err(|e| Box::new(e) as Box<dyn Error + Send>)?;
 
         if data.trim().is_empty() {
-            println!("Config file is empty. Initializing a new empty config.");
+            log::info!("Config file is empty. Initializing a new empty config.");
             return Ok(Config::default());
         }
 
@@ -151,7 +151,7 @@ pub fn ensure_paths_exist() -> io::Result<()> {
 
     for path in paths_to_create {
         if !path.exists() {
-            println!("Creating directory: {}", path.display());
+            log::info!("Creating directory: {}", path.display());
             fs::create_dir_all(path)?;
         }
     }
@@ -162,7 +162,7 @@ pub fn ensure_paths_exist() -> io::Result<()> {
 
     for file in files_to_create {
         if !file.exists() {
-            println!("Creating empty file: {}", file.display());
+            log::info!("Creating empty file: {}", file.display());
             fs::File::create(file)?;
         }
     }
@@ -216,7 +216,7 @@ pub fn run_windows_cmd(cmd_input: &str) -> Result<(), Box<dyn std::error::Error>
 }
 
 pub fn check_for_updates() -> Result<(), Box<dyn Error>> {
-    println!("Checking for updates:\nOpening updater at {:?}", GAMEMON_UPDATER.as_path());
+    log::info!("Checking for updates:\nOpening updater at {:?}", GAMEMON_UPDATER.as_path());
     
     #[cfg(unix)]
     {

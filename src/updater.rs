@@ -32,7 +32,7 @@ pub fn main() {
 
 pub fn update() -> Result<(), Box<dyn std::error::Error>> {
     if let Err(e) = ensure_paths_exist() {
-        eprintln!("Error ensuring paths exist: {}", e);
+        log::error!("Error ensuring paths exist: {}", e);
     }
 
     // GitHub API URL for latest release
@@ -56,16 +56,16 @@ pub fn update() -> Result<(), Box<dyn std::error::Error>> {
 
     // Compare versions
     if latest_version == current_version {
-        println!("You are already on the latest version: {}", current_version);
+        log::info!("You are already on the latest version: {}", current_version);
         #[cfg(unix)]
         {
             if !is_service_running(){
                 let _start = match start_game_mon(){
                     Ok(_) => {
-                        println!("Restarted GameMon Successfully!")
+                        log::info!("Restarted GameMon Successfully!")
                     }
                     Err(e) => {
-                        println!("Error restarting GameMon: {:?}", e)
+                        log::info!("Error restarting GameMon: {:?}", e)
                     }
                 };
             }
@@ -73,7 +73,7 @@ pub fn update() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(()); // No update needed
     }
 
-    println!("Update available! Current version: {}, Latest version: {}", current_version, latest_version);
+    log::info!("Update available! Current version: {}, Latest version: {}", current_version, latest_version);
 
     // Detect the current platform (target OS and architecture)
     let target_os = if cfg!(target_os = "linux") {
@@ -108,7 +108,7 @@ pub fn update() -> Result<(), Box<dyn std::error::Error>> {
         };
 
         // Proceed to download the correct file based on the asset URL
-        println!("Downloading from: {}", asset_url);
+        log::info!("Downloading from: {}", asset_url);
 
         // Get system's temp directory from TMP environment variable
         let tmp_dir = env::var("TMP")
@@ -165,7 +165,7 @@ pub fn update() -> Result<(), Box<dyn std::error::Error>> {
         // Replace the current executable  
 
         // Stop all instances of GameMon first
-        println!("Stopping all GameMon processes...");
+        log::info!("Stopping all GameMon processes...");
         let _stop = stop_game_mon();
 
         // Then replace
@@ -175,18 +175,18 @@ pub fn update() -> Result<(), Box<dyn std::error::Error>> {
 
         match failed_ops {
             Ok(_) => {
-                println!("All files installed successfully!");
+                log::info!("All files installed successfully!");
                 let _start = match start_game_mon(){
                     Ok(_) => {
-                        println!("Started GameMon Successfully!")
+                        log::info!("Started GameMon Successfully!")
                     }
                     Err(e) => {
-                        println!("Error starting GameMon: {:?}", e)
+                        log::info!("Error starting GameMon: {:?}", e)
                     }
                 };
             },
             Err(e) => {
-                eprintln!("Some files failed to install. Error: {:?}", e);
+                log::error!("Some files failed to install. Error: {:?}", e);
                 std::process::exit(1);
             }
         }
@@ -214,7 +214,7 @@ pub fn update() -> Result<(), Box<dyn std::error::Error>> {
         }
         
     } else {
-        println!("User chose not to update.");
+        log::info!("User chose not to update.");
     }
 
     #[cfg(unix)]
@@ -222,10 +222,10 @@ pub fn update() -> Result<(), Box<dyn std::error::Error>> {
         if !is_service_running(){
             let _start = match start_game_mon(){
                 Ok(_) => {
-                    println!("Restarted GameMon Successfully!")
+                    log::info!("Restarted GameMon Successfully!")
                 }
                 Err(e) => {
-                    println!("Error restarting GameMon: {:?}", e)
+                    log::info!("Error restarting GameMon: {:?}", e)
                 }
             };
         }
@@ -236,7 +236,7 @@ pub fn update() -> Result<(), Box<dyn std::error::Error>> {
 
 pub fn install() -> Result<(), Box<dyn std::error::Error>> {
     if let Err(e) = ensure_paths_exist() {
-        eprintln!("Error ensuring paths exist: {}", e);
+        log::error!("Error ensuring paths exist: {}", e);
     }
 
     // GitHub API URL for latest release
@@ -255,7 +255,7 @@ pub fn install() -> Result<(), Box<dyn std::error::Error>> {
         .as_str()
         .ok_or("No version found in release")?;
 
-    println!("Installing latest version: {}", latest_version);
+    log::info!("Installing latest version: {}", latest_version);
 
     // Show a Yes/No dialog to the user
     let result = MessageDialog::new()
@@ -292,7 +292,7 @@ pub fn install() -> Result<(), Box<dyn std::error::Error>> {
         };
 
         // Proceed to download the correct file based on the asset URL
-        println!("Downloading from: {}", asset_url);
+        log::info!("Downloading from: {}", asset_url);
 
         // Get system's temp directory from TMP environment variable
         let tmp_dir = env::var("TMP")
@@ -342,7 +342,7 @@ pub fn install() -> Result<(), Box<dyn std::error::Error>> {
         // Replace the current executable  
 
         // Stop all instances of GameMon first
-        println!("Stopping all GameMon processes...");
+        log::info!("Stopping all GameMon processes...");
         let _stop = stop_game_mon();
 
         // Then replace
@@ -352,18 +352,18 @@ pub fn install() -> Result<(), Box<dyn std::error::Error>> {
 
         match failed_ops {
             Ok(_) => {
-                println!("All files installed successfully!");
+                log::info!("All files installed successfully!");
                 let _start = match start_game_mon(){
                     Ok(_) => {
-                        println!("Started GameMon Successfully!")
+                        log::info!("Started GameMon Successfully!")
                     }
                     Err(e) => {
-                        println!("Error starting GameMon: {:?}", e)
+                        log::info!("Error starting GameMon: {:?}", e)
                     }
                 };
             },
             Err(e) => {
-                eprintln!("Some files failed to install. Error: {:?}", e);
+                log::error!("Some files failed to install. Error: {:?}", e);
                 std::process::exit(1);
             }
         }
@@ -391,7 +391,7 @@ pub fn install() -> Result<(), Box<dyn std::error::Error>> {
         }
         
     } else {
-        println!("User chose not to update.");
+        log::info!("User chose not to update.");
     }
 
     #[cfg(unix)]
@@ -399,10 +399,10 @@ pub fn install() -> Result<(), Box<dyn std::error::Error>> {
         if !is_service_running(){
             let _start = match start_game_mon(){
                 Ok(_) => {
-                    println!("Started GameMon Successfully!")
+                    log::info!("Started GameMon Successfully!")
                 }
                 Err(e) => {
-                    println!("Error Starting GameMon: {:?}", e)
+                    log::info!("Error Starting GameMon: {:?}", e)
                 }
             };
         }
@@ -412,10 +412,10 @@ pub fn install() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn copy_dir_recursive(src: &Path, dest: &Path) -> io::Result<()> {
-    println!("Checking if source directory exists: {:?}", src);
+    log::info!("Checking if source directory exists: {:?}", src);
     
     if !src.exists() || !src.is_dir() {
-        println!("Error: Source directory does not exist or is not a directory.");
+        log::info!("Error: Source directory does not exist or is not a directory.");
         return Err(io::Error::new(
             io::ErrorKind::NotFound,
             "Source directory does not exist or is not a directory",
@@ -424,14 +424,14 @@ fn copy_dir_recursive(src: &Path, dest: &Path) -> io::Result<()> {
 
     // Create destination directory if it does not exist
     if !dest.exists() {
-        println!("Creating destination directory: {:?}", dest);
+        log::info!("Creating destination directory: {:?}", dest);
         fs::create_dir_all(dest)?;
     } else {
-        println!("Found destination directory: {:?}", dest);
+        log::info!("Found destination directory: {:?}", dest);
     }
 
     // Iterate over each entry in the source directory
-    println!("Reading directory contents: {:?}", src);
+    log::info!("Reading directory contents: {:?}", src);
     for entry in fs::read_dir(src)? {
         let entry = entry?;
         let file_type = entry.file_type()?;
@@ -439,21 +439,21 @@ fn copy_dir_recursive(src: &Path, dest: &Path) -> io::Result<()> {
         let dest_path = dest.join(entry.file_name());
 
         if file_type.is_dir() {
-            println!("Entering subdirectory: {:?} -> {:?}", src_path, dest_path);
+            log::info!("Entering subdirectory: {:?} -> {:?}", src_path, dest_path);
             // Recursively copy subdirectory
             copy_dir_recursive(&src_path, &dest_path)?;
         } else {
-            println!("Copying file: {:?} -> {:?}", src_path, dest);
+            log::info!("Copying file: {:?} -> {:?}", src_path, dest);
             // Copy individual file
             match fs::copy(&src_path, &dest) {
                 Ok(bytes_copied) => {
-                    println!(
+                    log::info!(
                         "Success: Copied {} bytes from {:?} to {:?}",
                         bytes_copied, src_path, dest
                     );
                 }
                 Err(e) => {
-                    println!(
+                    log::info!(
                         "Error: Failed to copy file {:?} -> {:?}: {}",
                         src_path, dest, e
                     );
@@ -463,7 +463,7 @@ fn copy_dir_recursive(src: &Path, dest: &Path) -> io::Result<()> {
         }
     }
 
-    println!("Finished copying directory: {:?}", src);
+    log::info!("Finished copying directory: {:?}", src);
     Ok(())
 }
 
@@ -481,7 +481,7 @@ fn extract_tar_gz(tar_gz_path: &Path, extract_to: &Path) -> Result<(), Box<dyn s
     // Extract the tar.gz file
     archive.unpack(extract_to)?;
 
-    println!("Extracted files to {:?}", extract_to);
+    log::info!("Extracted files to {:?}", extract_to);
     Ok(())
 }
 
@@ -518,7 +518,7 @@ fn extract_zip(zip_path: &Path, extract_to: &Path) -> Result<(), Box<dyn Error>>
         }
     }
 
-    println!("Extracted ZIP files to {:?}", extract_to);
+    log::info!("Extracted ZIP files to {:?}", extract_to);
     Ok(())
 }
 
@@ -562,7 +562,7 @@ fn stop_game_mon() -> Result<(), Box<dyn std::error::Error>> {
                     if !remaining_processes.is_empty() {
                         let count = &remaining_processes.len() -1;
                         let p = &remaining_processes[count];
-                        println!("Killing {:?}", &remaining_processes[count]);
+                        log::info!("Killing {:?}", &remaining_processes[count]);
                         let _check_output = ProcessCommand::new("pkill")
                             .arg(p)
                             .output()?;
@@ -574,7 +574,7 @@ fn stop_game_mon() -> Result<(), Box<dyn std::error::Error>> {
                 }
 
                 if remaining_processes.is_empty() {
-                    println!("All instances of GameMon (including GameMon-gui) have been stopped.");
+                    log::info!("All instances of GameMon (including GameMon-gui) have been stopped.");
                     return Ok(());
                 } else {
                     for p in remaining_processes {
@@ -584,7 +584,7 @@ fn stop_game_mon() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
 
-                eprintln!("Some GameMon instances are still running on attempt {}.", attempts + 1);
+                log::error!("Some GameMon instances are still running on attempt {}.", attempts + 1);
             }
         }
 
@@ -606,27 +606,27 @@ fn stop_game_mon() -> Result<(), Box<dyn std::error::Error>> {
 
                     if stderr_str.contains("not found") {
                         // If the process was not found, consider it "closed" and break out of the loop
-                        println!("{:?} is not running. Proceeding as closed.", gp);
+                        log::info!("{:?} is not running. Proceeding as closed.", gp);
                         break;
                     } else {
-                        eprintln!("Failed to stop {:?} processes on attempt {}. taskkill output: {:?}", gp, attempts + 1, output);
+                        log::error!("Failed to stop {:?} processes on attempt {}. taskkill output: {:?}", gp, attempts + 1, output);
                     }
                 } else {
-                    println!("Successfully stopped {:?}", gp);
+                    log::info!("Successfully stopped {:?}", gp);
                     break;
                 }
             }
         }
 
         // Wait before retrying (optional, you can adjust the duration)
-        println!("Retrying to stop GameMon... (Attempt {})", attempts + 1);
+        log::info!("Retrying to stop GameMon... (Attempt {})", attempts + 1);
         std::thread::sleep(std::time::Duration::from_secs(2)); // 2 seconds delay between retries
 
         attempts += 1;
     }
 
     // If the loop completes without success, return an error
-    eprintln!("Failed to stop all GameMon processes after {} attempts.", MAX_RETRIES);
+    log::error!("Failed to stop all GameMon processes after {} attempts.", MAX_RETRIES);
     Err("Failed to stop all GameMon processes.".into())
 }
 
@@ -658,7 +658,7 @@ fn start_game_mon() -> Result<(), Box<dyn std::error::Error>> {
         // Spawn the GameMon executable as a new process on Windows
         let _child = std::process::Command::new(&*GAMEMON_SERVICE_EXECUTABLE)
             .spawn()?; // Spawn the process and detach it
-        println!("GameMon started successfully.");
+        log::info!("GameMon started successfully.");
         Ok(())
     }
 }
@@ -683,7 +683,7 @@ fn check_service(program_name: &str) -> Result<bool, Box<dyn std::error::Error>>
         let output_str = String::from_utf8_lossy(&output.stdout);
         output_str.to_lowercase().contains(&program_name.to_lowercase())
     } else {
-        eprintln!("Unsupported OS");
+        log::error!("Unsupported OS");
         exit(1);
     };
 
@@ -702,7 +702,7 @@ fn is_active(program_name: &str) -> Result<bool, Box<dyn std::error::Error>>{
         {
             Ok(output) => output,
             Err(e) => {
-                eprintln!("Failed to check service status for {}: {}", program_name, e);
+                log::error!("Failed to check service status for {}: {}", program_name, e);
                 Output {
                     status: ExitStatus::from_raw(if cfg!(unix) { 1 } else { 0 }), // Unix uses 1, Windows default is 0
                     stdout: Vec::new(),
@@ -728,7 +728,7 @@ fn is_service_running() -> bool {
     let check_output = match ProcessCommand::new("pgrep").arg("GameMon").output() {
         Ok(output) => output,
         Err(e) => {
-            eprintln!("Failed to execute pgrep: {}", e);
+            log::error!("Failed to execute pgrep: {}", e);
             Output {
                 status: ExitStatus::from_raw(if cfg!(unix) { 1 } else { 0 }), // Unix uses 1, Windows default is 0
                 stdout: Vec::new(),

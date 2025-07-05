@@ -21,6 +21,7 @@ use iced::Color;
 use crate::config;
 use crate::config::{GAMEMON_CONFIG_FILE, ensure_paths_exist};
 
+// Define the Gui struct
 pub struct Gui {
     game_name_field: String,      // List of game names
     selected_game_name: Option<String>, // Currently selected game name
@@ -35,7 +36,7 @@ pub struct Gui {
 impl Default for Gui{
     fn default() -> Self {
         if let Err(e) = ensure_paths_exist() {
-            eprintln!("Error ensuring paths exist: {}", e);
+            log::error!("Error ensuring paths exist: {}", e);
         }
         let config = config::Config::load_from_file(&GAMEMON_CONFIG_FILE.to_string_lossy()).unwrap();
         let mut game_names = Vec::new();
@@ -65,6 +66,8 @@ pub enum Message {
     GameExectuableChanged(String),
     GameSelected(String),
     StartCommandsChanged(text_editor::Action),
+    TestStartCommands,
+    TestEndCommands,
     EndCommandsChanged(text_editor::Action),
     NewEntry,
     SaveEntry,
@@ -97,9 +100,35 @@ impl Gui {
                 self.start_commands_field.perform(action);
                 self.entry_changed = true;
             }
+            Message::TestStartCommands => {
+                for cmd in self.start_commands_field.text().lines() {
+                    if !cmd.trim().is_empty() {
+                        if let Err(e) = std::process::Command::new("sh")
+                            .arg("-c")
+                            .arg(cmd)
+                            .spawn()
+                        {
+                            log::error!("Failed to run start command '{}': {}", cmd, e);
+                        }
+                    }
+                }
+            }
             Message::EndCommandsChanged(action) => {
                 self.end_commands_field.perform(action);
                 self.entry_changed = true;
+            }
+            Message::TestEndCommands => {
+                for cmd in self.end_commands_field.text().lines() {
+                    if !cmd.trim().is_empty() {
+                        if let Err(e) = std::process::Command::new("sh")
+                            .arg("-c")
+                            .arg(cmd)
+                            .spawn()
+                        {
+                            log::error!("Failed to run end command '{}': {}", cmd, e);
+                        }
+                    }
+                }
             }
             Message::GameSelected(game_name) => {
                 self.selected_game_name = Some(game_name.clone());
@@ -148,7 +177,7 @@ impl Gui {
         }
     }
 
-    pub fn view(&self) -> Row<Message> {
+    pub fn view(&'_ self) -> Row<'_, Message> {
         // Definte left container
         let left_container = container(
             column![
@@ -217,20 +246,43 @@ impl Gui {
 
                 // Start Commands label and field
                 text("Start Commands:").align_x(Left),
-                text_editor(&self.start_commands_field)
-                    .placeholder("Start commands...")
-                    .on_action(Message::StartCommandsChanged)
-                    .size(14),
+                row![
+                    text_editor(&self.start_commands_field)
+                        .placeholder("Start commands...")
+                        .on_action(Message::StartCommandsChanged)
+                        .size(14),
+
+                    // Horizontal space
+                    horizontal_space().width(10),
+
+                    button("Run")
+                        .on_press(Message::TestStartCommands)
+                        .padding(5)
+                        .height(30)
+                        .width(50),
+                ],
+
 
                 // Vertical space
                 vertical_space().height(10),
                 
                 // End Commands label and field
                 text("End Commands:").align_x(Left),
-                text_editor(&self.end_commands_field)
-                    .placeholder("End commands...")
-                    .on_action(Message::EndCommandsChanged)
-                    .size(14),
+                row![
+                    text_editor(&self.end_commands_field)
+                        .placeholder("End commands...")
+                        .on_action(Message::EndCommandsChanged)
+                        .size(14),
+                    
+                    // Horizontal space
+                    horizontal_space().width(10),
+
+                    button("Run")
+                        .on_press(Message::TestEndCommands)
+                        .padding(5)
+                        .height(30)
+                        .width(50),
+                ],
 
                 // Vertical space
                 vertical_space().height(Fill),
@@ -282,7 +334,7 @@ impl Gui {
         let mut config = config::Config::load_from_file(&GAMEMON_CONFIG_FILE.to_string_lossy()).unwrap();
         if let Some(index) = config.entries.iter().position(|entry| entry.game_name == self.game_name_field){
             
-            println!("Entry already exists at index {}", index);
+            log::info!("Entry already exists at index {}", index);
 
             config.entries[index].game_name = self.game_name_field.clone();
             config.entries[index].executable = self.game_executable_field.clone();
@@ -291,7 +343,7 @@ impl Gui {
 
         } else {
             
-            println!("Entry does not exist");
+            log::info!("Entry does not exist");
 
             let new_entry = config::Entry {
                 game_name: self.game_name_field.clone(),

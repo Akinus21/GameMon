@@ -3,14 +3,19 @@ use std::process::{exit, Command};
 use std::sync::mpsc;
 use std::{env, fs, thread};
 use std::time::Duration;
-use game_mon::config::{GAMEMON_BIN_DIR
-    , GAMEMON_DIR
-    , GAMEMON_GUI_EXECUTABLE
-    , GAMEMON_RESOURCE_DIR
-    , check_for_updates
+use game_mon::config::{check_for_updates,
+    Config,
+    GAMEMON_BIN_DIR,
+    GAMEMON_CONFIG_FILE,
+    GAMEMON_DIR,
+    GAMEMON_GUI_EXECUTABLE,
+    GAMEMON_RESOURCE_DIR
 };
 use game_mon::service;
 use game_mon::tray;
+
+mod logger;
+
 #[cfg(windows)]
 use GameMon::config;
 
@@ -21,30 +26,27 @@ use std::os::windows::process::CommandExt;
 use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
 
 pub fn main() {
+    logger::Logger::init().expect("Failed to initialize logger");
     
-    match check_for_updates() {
-        Ok(_) => println!("Check for updates complete!"),
-        Err(e) => eprintln!("Error checking for updates: {:?}\n", e),
-    }
-
-
+    log::info!("MAIN FUNCTION ENTRY: Starting GameMon...");
+    
     // Check if the gamemon directory exists.  If not, create it.
     if !GAMEMON_DIR.as_path().exists() {
-        println!("Home directory does not exist. Creating it...");
+        log::info!("Home directory does not exist. Creating it...");
         if let Err(e) = fs::create_dir_all(GAMEMON_DIR.as_path()) {
-            eprintln!("Failed to create directory: {}", e);
+            log::error!("Failed to create directory: {}", e);
         } else {
-            println!("Directory created at {:?}", GAMEMON_DIR.as_path());
+            log::info!("Directory created at {:?}", GAMEMON_DIR.as_path());
         }
     } else {
-        // println!("Directory already exists at {:?}", dir_path);
+        // log::info!("Directory already exists at {:?}", dir_path);
     }
 
     // Set the working directory to the new path
     if let Err(e) = env::set_current_dir(GAMEMON_DIR.as_path()) {
-        eprintln!("Failed to change directory: {}", e);
+        log::error!("Failed to change directory: {}", e);
     } else {
-        println!("Current directory changed to {:?}", GAMEMON_DIR.as_path());
+        log::info!("Current directory changed to {:?}", GAMEMON_DIR.as_path());
     }
 
     // Check the OS and set things accordingly
@@ -54,11 +56,11 @@ pub fn main() {
             let runtime_dir = format!("/run/user/{}", uid);
             env::set_var("XDG_RUNTIME_DIR", runtime_dir);
         } else {
-            eprintln!("Warning: Could not determine UID, XDG_RUNTIME_DIR not set.");
+            log::error!("Warning: Could not determine UID, XDG_RUNTIME_DIR not set.");
         }
 
     } else if cfg!(target_os = "windows") {
-        println!("Running on Windows");
+        log::info!("Running on Windows");
         // Windows-specific actions
 
         // Add the directory to the PATH environment variable
@@ -69,10 +71,10 @@ pub fn main() {
         env::set_var("PATH", path);
 
     } else if cfg!(target_os = "macos") {
-        println!("Running on macOS");
+        log::info!("Running on macOS");
         // macOS-specific actions
     } else {
-        println!("Running on an unknown OS");
+        log::info!("Running on an unknown OS");
         // Fallback actions
     }
 
@@ -86,7 +88,7 @@ pub fn main() {
         let result = service::watchdog();
         // Send the result back to the main thread
         if let Err(e) = wtx.send(result) {
-            eprintln!("Failed to send watchdog result to main thread: {}", e);
+            log::error!("Failed to send watchdog result to main thread: {}", e);
         }
     });
 
@@ -108,14 +110,14 @@ pub fn main() {
         // Handle watchdog messages
         match wrx.try_recv() {
             Ok(Ok(_)) => {
-                println!("Watchdog started successfully.");
+                log::info!("Watchdog started successfully.");
             }
             Ok(Err(e)) => {
-                eprintln!("Watchdog encountered an error: {}", e);
+                log::error!("Watchdog encountered an error: {}", e);
                 break;
             }
             Err(mpsc::TryRecvError::Disconnected) => {
-                eprintln!("Watchdog thread disconnected. Exiting...");
+                log::error!("Watchdog thread disconnected. Exiting...");
                 break;
             }
             Err(mpsc::TryRecvError::Empty) => {
@@ -128,27 +130,45 @@ pub fn main() {
             Ok(message) => {
                 match message.as_str() {
                     "quit" => {
-                        println!("Received quit message from tray.");
+                        log::info!("Received quit message from tray.");
                         break; // Exit the main loop
                     }
                     "show_gui" => {
-                        println!("Received Show GUI message from tray.");
+                        log::info!("Received Show GUI message from tray.");
                             show_gui();
                     }
                     "updates" => {
-                        println!("Received Check for Updates message from tray.");
+                        log::info!("Received Check for Updates message from tray.");
                         match check_for_updates() {
-                            Ok(_) => println!("Check for updates complete!"),
-                            Err(e) => eprintln!("Error checking for updates: {:?}\n", e),
+                            Ok(_) => log::info!("Check for updates complete!"),
+                            Err(e) => log::error!("Error checking for updates: {:?}\n", e),
+                        }
+                    }
+                    msg if msg.starts_with("start:") => {
+                        let game_name = msg.trim_start_matches("start:");
+                        log::info!("Running start commands for {}", game_name);
+                        if let Ok(config) = Config::load_from_file(&GAMEMON_CONFIG_FILE.to_string_lossy()) {
+                            if let Some(entry) = config.entries.iter().find(|e| e.game_name == game_name) {
+                                let _ = service::run_commands(&entry.start_commands);
+                            }
+                        }
+                    }
+                    msg if msg.starts_with("end:") => {
+                        let game_name = msg.trim_start_matches("end:");
+                        log::info!("Running end commands for {}", game_name);
+                        if let Ok(config) = Config::load_from_file(&GAMEMON_CONFIG_FILE.to_string_lossy()) {
+                            if let Some(entry) = config.entries.iter().find(|e| e.game_name == game_name) {
+                                let _ = service::run_commands(&entry.end_commands);
+                            }
                         }
                     }
                     other => {
-                        println!("Received message from tray: {}", other);
+                        log::info!("Received message from tray: {}", other);
                     }
                 }
             }
             Err(mpsc::TryRecvError::Disconnected) => {
-                eprintln!("Tray thread disconnected. Exiting...");
+                log::error!("Tray thread disconnected. Exiting...");
                 break;
             }
             Err(mpsc::TryRecvError::Empty) => {
@@ -160,7 +180,7 @@ pub fn main() {
         thread::sleep(Duration::from_secs(1));
     }
 
-    println!("Main function exiting.");
+    log::info!("Main function exiting.");
 
 }
 
@@ -171,7 +191,7 @@ pub fn show_gui() {
 
     // Check if the file exists before attempting to execute it
     if !gui_path.exists() {
-        eprintln!("Error: GameMon-gui not found at {:?}", gui_path);
+        log::error!("Error: GameMon-gui not found at {:?}", gui_path);
         exit(1); // Exit or handle the error appropriately
     }
 
@@ -182,10 +202,10 @@ pub fn show_gui() {
         match Command::new(gui_path_str).spawn() {
             Ok(_child) => {
                 // Optionally, handle child process output, status, etc.
-                println!("Successfully spawned GameMon-gui.");
+                log::info!("Successfully spawned GameMon-gui.");
             }
             Err(e) => {
-                eprintln!("Failed to spawn GameMon-gui: {}", e);
+                log::error!("Failed to spawn GameMon-gui: {}", e);
                 exit(1); // Exit or handle the error appropriately
             }
         }
@@ -194,8 +214,8 @@ pub fn show_gui() {
     #[cfg(windows)]
     {
         match config::run_windows_cmd(&gui_path_str) {
-            Ok(_) => println!("{:?} executed successfully", &gui_path_str),
-            Err(e) => eprintln!("Failed to execute command '{}': {}", &gui_path_str, e),
+            Ok(_) => log::info!("{:?} executed successfully", &gui_path_str),
+            Err(e) => log::error!("Failed to execute command '{}': {}", &gui_path_str, e),
         }
     }
 }

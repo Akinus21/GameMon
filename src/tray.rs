@@ -5,6 +5,8 @@ use std::path::PathBuf;
 use std::sync::mpsc;
 use std::sync::Arc;
 use std::sync::Mutex;
+use crate::config::{Config, GAMEMON_CONFIG_FILE};
+use gtk::{MenuItem, Menu};
 #[cfg(windows)]
 use tray_item::TrayItem;
 
@@ -32,11 +34,13 @@ pub fn spawn_tray(
 
         application.connect_activate(move |_| {
             // Build tray application
+
+            use gtk::SeparatorMenuItem;
             let mut indicator = AppIndicator::new("Example", "applications-internet");
             indicator.set_status(AppIndicatorStatus::Active);
             indicator.set_title(&title);
             let icon = icon_path.to_str().unwrap();
-            println!("DEBUG: Icon at {:?}", icon);
+            // log::info!("DEBUG: Icon at {:?}", icon);
             indicator.set_icon(icon);
 
             // Build menu
@@ -66,6 +70,50 @@ pub fn spawn_tray(
                 });
                 new_menu.append(&mi);
             }
+            
+            // Add separator before dynamic BOLOs
+            new_menu.append(&SeparatorMenuItem::new());
+
+            // Build BOLOs menu
+            let bolos_item = MenuItem::with_label("BOLOs");
+            let bolos_menu = Menu::new();
+
+            if let Ok(config) = Config::load_from_file(&GAMEMON_CONFIG_FILE.to_string_lossy()) {
+                for entry in config.entries {
+                    let game_name = entry.game_name.clone();
+
+                    let game_item = MenuItem::with_label(&game_name);
+                    let game_submenu = Menu::new();
+
+                    let start_item = MenuItem::with_label("Run Start Commands");
+                    let end_item = MenuItem::with_label("Run End Commands");
+
+                    let sender_start = Arc::clone(&sender);
+                    let sender_end = Arc::clone(&sender);
+                    let game_name_start = game_name.clone();
+                    let game_name_end = game_name.clone();
+
+                    start_item.connect_activate(move |_| {
+                        if let Ok(s) = sender_start.lock() {
+                            let _ = s.send(format!("start:{}", game_name_start));
+                        }
+                    });
+
+                    end_item.connect_activate(move |_| {
+                        if let Ok(s) = sender_end.lock() {
+                            let _ = s.send(format!("end:{}", game_name_end));
+                        }
+                    });
+
+                    game_submenu.append(&start_item);
+                    game_submenu.append(&end_item);
+                    game_item.set_submenu(Some(&game_submenu));
+                    bolos_menu.append(&game_item);
+                }
+            }
+
+            bolos_item.set_submenu(Some(&bolos_menu));
+            new_menu.append(&bolos_item);
 
             new_menu.show_all();
             indicator.set_menu(&mut new_menu);
