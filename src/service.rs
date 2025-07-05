@@ -3,7 +3,7 @@ use std::{process::Command, sync::{mpsc, Arc}, thread};
 use std::time::Duration;
 use crate::config::Config;
 use dashmap::DashMap;
-use crate::config::{GAMEMON_CONFIG_FILE, check_for_updates};
+use crate::config::{GAMEMON_CONFIG_FILE, GAMEMON_DIR, check_for_updates};
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 use std::collections::HashSet;
@@ -18,9 +18,15 @@ pub fn watchdog() -> Result<(), Box<dyn std::error::Error + Send>> {
 
     loop {
         if update_timer >= 600 {
-            match check_for_updates() {
-                Ok(_) => log::info!("Check for updates complete!"),
-                Err(e) => log::error!("Error checking for updates: {:?}\n", e),
+            let update_marker = GAMEMON_DIR.join(".update-pending");
+            if update_marker.exists() {
+                log::warn!("Previous update may have failed or is in progress.");
+                // optionally alert user or recover
+            } else {
+                match check_for_updates() {
+                    Ok(_) => log::info!("Check for updates complete!"),
+                    Err(e) => log::error!("Error checking for updates: {:?}\n", e),
+                }
             }
             update_timer = 0;
         }

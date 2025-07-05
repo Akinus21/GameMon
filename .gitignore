@@ -12,3 +12,5 @@
 /build.sh
 /gamemon.code-workspace
 .continue/
+.commit
+.new-release
