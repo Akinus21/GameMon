@@ -1,6 +1,6 @@
 [package]
 name = "game_mon"
-version = "0.6.0"
+version = "0.5.4"
 description = "Gaming Monitor"
 authors = ["Akinus21"]
 license = ""
@@ -68,6 +68,7 @@ windows-sys = { version = "0.59", features = [
     "Win32_System_Memory"
 ] }
 windows = "0.59.0"
+rfd = "0.15.3"
 
 
 

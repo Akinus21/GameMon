@@ -89,19 +89,24 @@ mod platform_logger {
 }
 
 fn get_project_name() -> String {
-    let cargo_toml_path = env::var("CARGO_MANIFEST_DIR").unwrap();
-    let file_path = format!("{}/Cargo.toml", cargo_toml_path);
-
-    fs::read_to_string(&file_path).unwrap_or_else(|_| panic!("Could not read Cargo.toml at {}", &file_path))
-        .lines()
-        .find_map(|line| {
-            if line.starts_with("name") {
-                Some(line.split_whitespace().next()?.to_string())
-            } else {
-                None
+    // Try CARGO_MANIFEST_DIR first
+    if let Ok(cargo_dir) = env::var("CARGO_MANIFEST_DIR") {
+        let file_path = format!("{}/Cargo.toml", cargo_dir);
+        if let Ok(content) = fs::read_to_string(&file_path) {
+            if let Some(name_line) = content.lines().find(|line| line.trim().starts_with("name")) {
+                let parts: Vec<&str> = name_line.split('=').collect();
+                if parts.len() == 2 {
+                    return parts[1].trim().trim_matches('"').to_string();
+                }
             }
-        })
-        .unwrap_or_else(|| panic!("Could not find 'name' field in Cargo.toml"))
+        }
+    }
+
+    // Fallback: use binary name
+    env::current_exe()
+        .ok()
+        .and_then(|path| path.file_stem().map(|s| s.to_string_lossy().to_string()))
+        .unwrap_or_else(|| "GameMon".to_string())
 }
 
 pub struct Logger {

@@ -9,7 +9,7 @@
 /build.rs
 /diagnostic.txt
 /releases
-/build.sh
+/build.*
 /gamemon.code-workspace
 .continue/
 .commit
