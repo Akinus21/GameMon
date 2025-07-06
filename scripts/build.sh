@@ -310,7 +310,7 @@ while [[ $# -gt 0 ]]; do
         --linux) build_linux=true; shift;;
         --all) build_windows=true; build_linux=true; shift;;
         --new-release)
-            create_release=true; shift
+            new_release=true; shift
             if [[ $# -gt 0 && "$1" != --* ]]; then
                 NEW_VERSION="$1"; shift
                 update_cargo_version_if_needed
