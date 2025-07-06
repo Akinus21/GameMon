@@ -1,6 +1,6 @@
 [package]
 name = "game_mon"
-version = "0.5.4"
+version = "0.6.1"
 description = "Gaming Monitor"
 authors = ["Akinus21"]
 license = ""
