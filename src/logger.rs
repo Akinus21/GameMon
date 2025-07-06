@@ -6,18 +6,20 @@ use std::env;
 mod platform_logger {
     use std::process::Command;
 
-    pub struct PlatformLogger;
+    pub struct PlatformLogger {
+        tag: String,
+    }
 
     impl PlatformLogger {
-        pub fn new() -> Self {
-            PlatformLogger
+        pub fn new(tag: String) -> Self {
+            PlatformLogger { tag }
         }
 
         pub fn log(&self, level: &str, msg: &str) {
             let full_command = format!(
                 "logger -p user.{} -t {} '{}'",
                 level,
-                crate::logger::get_project_name(),
+                self.tag,
                 msg.replace('\'', "'\\''") // escape single quotes
             );
 
@@ -42,15 +44,16 @@ mod platform_logger {
         }
     };
     use std::ffi::{OsStr, OsStrExt};
-    
+    use std::iter::once;
+
     pub struct PlatformLogger {
         handle: HANDLE,
     }
 
     impl PlatformLogger {
-        pub fn new() -> Self {
+        pub fn new(tag: String) -> Self {
             unsafe {
-                let source = to_wide(&get_project_name());
+                let source = to_wide(&tag);
                 let handle = RegisterEventSourceW(std::ptr::null_mut(), PCWSTR(source.as_ptr()));
                 Self { handle }
             }
@@ -84,12 +87,12 @@ mod platform_logger {
     }
 
     fn to_wide(s: &str) -> Vec<u16> {
-        OsStrExt::to_bytes(OsStr::new(s)).chain(Some(0)).collect()
+        OsStr::new(s).encode_wide().chain(once(0)).collect()
     }
 }
 
+/// Attempts to derive the project name from Cargo.toml or fallback to binary name.
 fn get_project_name() -> String {
-    // Try CARGO_MANIFEST_DIR first
     if let Ok(cargo_dir) = env::var("CARGO_MANIFEST_DIR") {
         let file_path = format!("{}/Cargo.toml", cargo_dir);
         if let Ok(content) = fs::read_to_string(&file_path) {
@@ -114,24 +117,28 @@ pub struct Logger {
 }
 
 impl Logger {
+    /// Use default target based on binary or Cargo.toml
     pub fn init() -> Result<(), SetLoggerError> {
+        let tag = get_project_name();
+        Self::init_with_target(&tag)
+    }
+
+    /// Use a custom log target for grouping logs across binaries
+    pub fn init_with_target(tag: &str) -> Result<(), SetLoggerError> {
         let logger = Box::new(Logger {
-            inner: Box::new(platform_logger::PlatformLogger::new()),
+            inner: Box::new(platform_logger::PlatformLogger::new(tag.to_string())),
         });
 
-        // Leak the box to get a 'static reference
         let leaked = Box::leak(logger);
-        
-        log::set_logger(leaked).unwrap();
+        log::set_logger(leaked)?;
         log::set_max_level(LevelFilter::Info);
-
         Ok(())
     }
 }
 
 impl log::Log for Logger {
     fn enabled(&self, metadata: &Metadata) -> bool {
-        metadata.level() <= Level::Info // Adjust as needed (include Warn, Error, etc)
+        metadata.level() <= Level::Info // Adjust as needed
     }
 
     fn log(&self, record: &Record) {

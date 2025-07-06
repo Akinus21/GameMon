@@ -1,6 +1,6 @@
 [package]
 name = "game_mon"
-version = "0.6.1"
+version = "0.6.2"
 description = "Gaming Monitor"
 authors = ["Akinus21"]
 license = ""
@@ -69,6 +69,7 @@ windows-sys = { version = "0.59", features = [
 ] }
 windows = "0.59.0"
 rfd = "0.15.3"
+signal-hook = "0.3.18"
 
 
 

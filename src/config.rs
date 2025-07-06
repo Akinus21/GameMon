@@ -216,7 +216,7 @@ pub fn run_windows_cmd(cmd_input: &str) -> Result<(), Box<dyn std::error::Error>
 }
 
 pub fn check_for_updates() -> Result<(), Box<dyn Error>> {
-    log::info!("Checking for updates:\nOpening updater at {:?}", GAMEMON_UPDATER.as_path());
+    log::info!("Checking for updates...");
     
     #[cfg(unix)]
     {

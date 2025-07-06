@@ -213,7 +213,7 @@ use std::io;
 /// Returns true if the command succeeded.
 pub fn run_shell_command(command_str: &str) -> bool {
     if command_str.trim().is_empty() {
-        log::error!("Empty command string; nothing to execute.");
+        log::warn!("⚠️ Empty command string provided, skipping execution.");
         return false;
     }
 

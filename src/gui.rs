@@ -2,9 +2,12 @@ use game_mon::app::Gui;
 use iced::settings::Settings;
 use iced::window::settings::Settings as Win_Settings;
 use game_mon::config::{GAMEMON_LOGO, check_for_updates, CURRENT_VERSION};
+mod logger;
 
 
 pub fn main() -> iced::Result {
+
+    logger::Logger::init_with_target("GameMon-service").expect("Failed to initialize logger");
 
     match check_for_updates() {
         Ok(_) => log::info!("Check for updates complete!"),

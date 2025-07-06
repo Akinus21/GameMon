@@ -27,39 +27,48 @@ struct GithubReleaseFull {
 
 #[tokio::main]
 async fn main() {
-    logger::Logger::init().expect("Failed to initialize logger");
+    logger::Logger::init_with_target("GameMon-service").expect("Failed to initialize logger");
 
     check_update_marker();
 
     let current_version = env!("CARGO_PKG_VERSION");
     let current_tag = format!("{}", current_version);
 
-    // Fetch latest release info AND download the asset
-    let (latest_tag, archive_path) = match fetch_latest_release_and_download().await {
-        Ok(data) => data,
+    // Step 1: Fetch latest release info (metadata only, no download)
+    let release = match fetch_latest_release().await {
+        Ok(release) => release,
         Err(err) => {
-            eprintln!("❌ Failed to fetch and download latest release: {}", err);
+            eprintln!("❌ Failed to fetch latest release info: {}", err);
             return;
         }
     };
 
-    println!("🛠️  Current: {}, Latest: {}", current_tag, latest_tag);
-
-    if current_tag != latest_tag {
+    if current_tag != release.tag_name {
         // Prompt user to update
+        log::warn!("New update available: {} -> {}", current_tag, release.tag_name);
+
         let want_update = MessageDialog::new()
             .set_level(MessageLevel::Info)
             .set_title("🎉 A new update is available! 🎉")
             .set_description(&format!(
                 "You are running version {} but version {} is now available.\nDo you want to update?",
-                current_tag, latest_tag
+                current_tag, release.tag_name
             ))
             .set_buttons(MessageButtons::YesNo)
-            .show(); // returns Yes if yes clicked
+            .show();
 
         log::info!("User update prompt response: {}", want_update);
 
         if want_update.to_string() == "Yes" {
+            // Step 2: Download the asset now that user approved
+            let (archive_path, latest_tag) = match download_release_asset(&release).await {
+                Ok(data) => data,
+                Err(e) => {
+                    eprintln!("❌ Failed to download latest release asset: {}", e);
+                    return;
+                }
+            };
+
             // Extract downloaded archive
             let extraction_result = {
                 #[cfg(unix)]
@@ -131,14 +140,14 @@ async fn main() {
                 }
             }
         } else {
-            log::info!("User declined the update.");
+            log::error!("User declined the update.");
         }
     } else {
-        println!("✅ Already up to date.");
+        log::info!("✅ Already up to date.");
     }
 }
 
-async fn fetch_latest_release_and_download() -> Result<(String, String), Box<dyn std::error::Error>> {
+async fn fetch_latest_release() -> Result<GithubReleaseFull, Box<dyn std::error::Error>> {
     let url = "https://api.github.com/repos/Akinus21/GameMon/releases/latest";
     let client = reqwest::Client::new();
     let response = client
@@ -153,8 +162,12 @@ async fn fetch_latest_release_and_download() -> Result<(String, String), Box<dyn
     }
 
     let release: GithubReleaseFull = response.json().await?;
-    log::info!("Latest release tag: {}", release.tag_name);
+    Ok(release)
+}
 
+async fn download_release_asset(
+    release: &GithubReleaseFull,
+) -> Result<(String, String), Box<dyn std::error::Error>> {
     // Determine platform and extension to match asset filename
     #[cfg(unix)]
     let (platform_substring, archive_ext) = ("linux", "tar.gz");
@@ -179,6 +192,7 @@ async fn fetch_latest_release_and_download() -> Result<(String, String), Box<dyn
 
     log::info!("Downloading asset: {} to {:?}", asset.name, archive_path);
 
+    let client = reqwest::Client::new();
     let mut resp = client.get(&asset.browser_download_url).send().await?;
 
     if !resp.status().is_success() {
@@ -195,7 +209,7 @@ async fn fetch_latest_release_and_download() -> Result<(String, String), Box<dyn
 
     log::info!("Downloaded asset successfully.");
 
-    Ok((release.tag_name, archive_path.to_string_lossy().to_string()))
+    Ok((archive_path.to_string_lossy().to_string(), release.tag_name.clone()))
 }
 
 fn run_deferred_installer(tmp_dir: &str, latest_version: &str) -> Result<(), Box<dyn std::error::Error>> {
