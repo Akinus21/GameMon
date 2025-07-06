@@ -220,17 +220,17 @@ pub fn check_for_updates(arg: String) -> Result<(), Box<dyn Error>> {
     
     #[cfg(unix)]
     {
-        if arg == "tray"{
+        if arg == "tray" {
             Command::new(GAMEMON_UPDATER.as_path())
                 .arg("--tray")
                 .spawn()
-                .map(|_| ()) // Convert `Result<Child, io::Error>` to `Result<(), io::Error>`
-                .map_err(|e| Box::new(e) as Box<dyn Error>) // Convert to `Box<dyn Error>`
+                .and_then(|mut child| child.wait().map(|_| ()))
+                .map_err(|e| Box::new(e) as Box<dyn Error>)
         } else {
             Command::new(GAMEMON_UPDATER.as_path())
                 .spawn()
-                .map(|_| ()) // Convert `Result<Child, io::Error>` to `Result<(), io::Error>`
-                .map_err(|e| Box::new(e) as Box<dyn Error>) // Convert to `Box<dyn Error>`
+                .and_then(|mut child| child.wait().map(|_| ()))
+                .map_err(|e| Box::new(e) as Box<dyn Error>)
         }
     }
 

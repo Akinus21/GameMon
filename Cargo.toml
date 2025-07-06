@@ -1,6 +1,6 @@
 [package]
 name = "game_mon"
-version = "0.6.3"
+version = "0.6.4"
 description = "Gaming Monitor"
 authors = ["Akinus21"]
 license = ""
@@ -29,7 +29,6 @@ path = "src/main.rs"
 [dependencies]
 futures = "0.3.31"
 gio = "0.20.7"
-glib = "0.20.7"
 iced = { version = "0.13.1", features = ["image"] }
 iced_native = "0.10.3"
 image = "0.25.5"
@@ -42,7 +41,6 @@ sysinfo = "0.33.1"
 notify-rust = "4.11.4"
 dashmap = "6.1.0"
 gtk = "0.18.2"
-gtk4 = "0.9.5"
 pango = "0.20.7"
 gdk-pixbuf = "0.20.7"
 atk = "0.18.2"
@@ -71,8 +69,8 @@ windows = "0.59.0"
 rfd = "0.15.3"
 signal-hook = "0.3.18"
 clap = { version = "4.5.40", features = ["derive"] }
-
-
+notify = "8.1.0"
+glib = "0.18.2"
 
 [target.'cfg(windows)'.build-dependencies]
 windres = "0.2"

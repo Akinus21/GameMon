@@ -2,267 +2,158 @@ use libappindicator::AppIndicator;
 use libappindicator::AppIndicatorStatus;
 use gtk::prelude::{ApplicationExt, ApplicationExtManual, *};
 use std::path::PathBuf;
-use std::sync::mpsc;
-use std::sync::Arc;
-use std::sync::Mutex;
+use std::sync::mpsc::Sender;
+use std::sync::{Arc, Mutex};
 use crate::config::{Config, GAMEMON_CONFIG_FILE};
-use gtk::{MenuItem, Menu};
+use gtk::{MenuItem, Menu, SeparatorMenuItem};
+use notify::{RecommendedWatcher, RecursiveMode, Watcher, EventKind};
+use glib::MainContext;
+use glib::ControlFlow;
+use std::rc::Rc;
+use std::cell::RefCell;
+
 #[cfg(windows)]
 use tray_item::TrayItem;
 
 use crate::config::CURRENT_VERSION;
 
+#[cfg(unix)]
 pub fn spawn_tray(
-    sender: mpsc::Sender<String>,
+    sender: Sender<String>,
     title: String,
     icon_path: PathBuf,
-    menu_var: Vec<(String, String)>, // Change &str to String for owned data
+    menu_var: Vec<(String, String)>,
 ) {
-    #[cfg(unix)]
-    {
-        // Linux/macOS solution using GTK and AppIndicator
-        let application = gtk::Application::new(
-            Some("com.example.trayapp"),
-            gtk::gio::ApplicationFlags::FLAGS_NONE,
-        );
+    let application = gtk::Application::new(
+        Some("com.example.trayapp"),
+        gtk::gio::ApplicationFlags::FLAGS_NONE,
+    );
 
-        // Wrap the sender in an Arc<Mutex<>> to make it thread-safe and shareable
-        let sender = Arc::new(Mutex::new(sender));
+    let sender = Arc::new(Mutex::new(sender));
+    let menu_var = menu_var.clone();
+    let icon_path_str = icon_path.to_str().expect("Invalid icon path").to_string();
+    let title_clone = title.clone();
 
-        // Clone `menu` so it moves into the closure
-        let menu_clone = menu_var.clone(); 
+    let (glib_tx, glib_rx) = glib::MainContext::channel(glib::Priority::default());
+    let glib_rx = Rc::new(RefCell::new(Some(glib_rx)));
 
-        application.connect_activate(move |_| {
-            // Build tray application
+    let config_path = GAMEMON_CONFIG_FILE.clone();
+    std::thread::spawn(move || {
+        let (tx, rx) = std::sync::mpsc::channel();
+        let mut watcher = RecommendedWatcher::new(tx, notify::Config::default())
+            .expect("Failed to create watcher");
+        watcher
+            .watch(config_path.as_path(), RecursiveMode::NonRecursive)
+            .expect("Failed to watch config file");
 
-            use gtk::SeparatorMenuItem;
-            let mut indicator = AppIndicator::new("Example", "applications-internet");
-            indicator.set_status(AppIndicatorStatus::Active);
-            indicator.set_title(&title);
-            let icon = icon_path.to_str().unwrap();
-            // log::info!("DEBUG: Icon at {:?}", icon);
-            indicator.set_icon(icon);
+        while let Ok(event) = rx.recv() {
+            if let Ok(ev) = event {
+                if matches!(ev.kind, EventKind::Modify(_)) {
+                    let _ = glib_tx.send(());
+                }
+            }
+        }
+    });
 
-            // Build menu
-            let mut new_menu = gtk::Menu::new();
+    application.connect_activate(move |app| {
+        let mut indicator = AppIndicator::new("gamemon-tray", "applications-internet");
+        indicator.set_status(AppIndicatorStatus::Active);
+        indicator.set_title(&title_clone);
+        indicator.set_icon(&icon_path_str);
 
-            // Add app name label
-                // Get current version from the package's version defined in Cargo.toml
+        let menu = Rc::new(RefCell::new(gtk::Menu::new()));
+        let menu_for_build = menu.clone();
+        let sender_for_build = sender.clone();
+        let menu_var = menu_var.clone();
+
+        let build_menu = move || {
+            let menu = menu_for_build.clone();
+            let sender = sender_for_build.clone();
+            let mut menu_ref = menu.borrow_mut();
+            let children: Vec<_> = menu_ref.children().iter().cloned().collect();
+            for child in children {
+                menu_ref.remove(&child);
+            }
+
             let app_name_item = gtk::MenuItem::with_label(&format!("GameMon v{}", CURRENT_VERSION.to_string()));
-            new_menu.append(&app_name_item);
+            app_name_item.set_sensitive(false);
+            menu_ref.append(&app_name_item);
+            menu_ref.append(&gtk::SeparatorMenuItem::new());
 
-            // Add Separator
-            let separator = gtk::SeparatorMenuItem::new();
-            new_menu.append(&separator);
-
-
-            // Add items from function call 
-            for item in menu_clone.clone() { // Cloning the owned `menu` vector
-                let mi = gtk::MenuItem::with_label(&item.0);
-                // Clone the Arc<Mutex<Sender>> for the closure
-                let sender_clone = Arc::clone(&sender);
+            for (label, command) in &menu_var {
+                let mi = gtk::MenuItem::with_label(label);
+                let command = command.clone();
+                let sender = sender.clone();
                 mi.connect_activate(move |_| {
-                    if let Ok(sender) = sender_clone.lock() {
-                        sender
-                            .send(item.1.clone().to_string()) // Clone the String to send it
-                            .expect("Failed to send message");
+                    if let Ok(tx) = sender.lock() {
+                        let _ = tx.send(command.clone());
                     }
                 });
-                new_menu.append(&mi);
+                menu_ref.append(&mi);
             }
-            
-            // Add separator before dynamic BOLOs
-            new_menu.append(&SeparatorMenuItem::new());
 
-            // Build BOLOs menu
-            let bolos_item = MenuItem::with_label("BOLOs");
-            let bolos_menu = Menu::new();
+            menu_ref.append(&gtk::SeparatorMenuItem::new());
+
+            let bolos_item = gtk::MenuItem::with_label("BOLOs");
+            let bolos_menu = gtk::Menu::new();
 
             if let Ok(config) = Config::load_from_file(&GAMEMON_CONFIG_FILE.to_string_lossy()) {
                 for entry in config.entries {
                     let game_name = entry.game_name.clone();
-
-                    let game_item = MenuItem::with_label(&game_name);
-                    let game_submenu = Menu::new();
-
-                    let start_item = MenuItem::with_label("Run Start Commands");
-                    let end_item = MenuItem::with_label("Run End Commands");
-
-                    let sender_start = Arc::clone(&sender);
-                    let sender_end = Arc::clone(&sender);
                     let game_name_start = game_name.clone();
                     let game_name_end = game_name.clone();
 
-                    start_item.connect_activate(move |_| {
-                        if let Ok(s) = sender_start.lock() {
-                            let _ = s.send(format!("start:{}", game_name_start));
+                    let item = gtk::MenuItem::with_label(&game_name);
+                    let sub = gtk::Menu::new();
+
+                    let sender_start = sender.clone();
+                    let sender_end = sender.clone();
+
+                    let start = gtk::MenuItem::with_label("Run Start Commands");
+                    let end = gtk::MenuItem::with_label("Run End Commands");
+
+                    start.connect_activate(move |_| {
+                        if let Ok(tx) = sender_start.lock() {
+                            let _ = tx.send(format!("start:{}", game_name_start));
                         }
                     });
 
-                    end_item.connect_activate(move |_| {
-                        if let Ok(s) = sender_end.lock() {
-                            let _ = s.send(format!("end:{}", game_name_end));
+                    end.connect_activate(move |_| {
+                        if let Ok(tx) = sender_end.lock() {
+                            let _ = tx.send(format!("end:{}", game_name_end));
                         }
                     });
 
-                    game_submenu.append(&start_item);
-                    game_submenu.append(&end_item);
-                    game_item.set_submenu(Some(&game_submenu));
-                    bolos_menu.append(&game_item);
+                    sub.append(&start);
+                    sub.append(&end);
+                    sub.show_all();
+
+                    item.set_submenu(Some(&sub));
+                    bolos_menu.append(&item);
                 }
             }
 
             bolos_item.set_submenu(Some(&bolos_menu));
-            new_menu.append(&bolos_item);
+            bolos_menu.show_all();
+            menu_ref.append(&bolos_item);
 
-            new_menu.show_all();
-            indicator.set_menu(&mut new_menu);
-        });
+            menu_ref.show_all();
+        };
 
-        application.run();
-    }
+        build_menu();
+        indicator.set_menu(&mut menu.borrow_mut());
 
-    #[cfg(target_os = "windows")]
-    {
-        // Windows solution using tray-item crate
-
-        // Load the icon image from file and get data
-        let img = ImageReader::open(GAMEMON_LOGO.as_path()).unwrap().decode().unwrap();
-        let (width, height) = img.dimensions();
-        let rgba = img.to_rgba8(); // Convert to RGBA8
-        let data = rgba.into_raw(); // Get raw pixel data
-        let hicon = load_icon_from_png(&*GAMEMON_LOGO.to_string_lossy());
-
-        // Create a TrayItem
-        let mut tray = TrayItem::new(
-            "GameMon",
-            IconSource::RawIcon(hicon as isize),
-        )
-        .unwrap();
-
-        // Create a menu for the tray
-        tray.add_label("GameMon").unwrap();
-
-        tray.inner_mut().add_separator().unwrap();
-
-        // let mut menu = TrayItemMenu::new();
-
-        for item in menu_var {
-            let sender = sender.clone(); // Clone the sender before using it in the closure
-            let _ = tray.add_menu_item(&item.0.clone(), move || {
-                // Send the selected action through the sender
-                sender.send(item.1.clone()).expect("Failed to send message");
+        let build_menu_clone = build_menu.clone();
+        if let Some(glib_rx_real) = glib_rx.borrow_mut().take() {
+            glib_rx_real.attach(None, move |_| {
+                log::info!("Tray: Config file changed, rebuilding menu...");
+                build_menu_clone();
+                ControlFlow::Continue
             });
         }
 
-        loop{
-            thread::sleep(time::Duration::from_secs(5));
-        }
+        app.add_window(&gtk::Window::new(gtk::WindowType::Toplevel));
+    });
 
-    }
+    application.run();
 }
-
-#[cfg(windows)]
-use winresource::WindowsResource;
-#[cfg(windows)]
-use image::GenericImageView;
-#[cfg(windows)]
-use image::ImageReader;
-#[cfg(windows)]
-use std::ptr;
-#[cfg(windows)]
-use std::ffi::c_void;
-#[cfg(windows)]
-use windows_sys::Win32::UI::WindowsAndMessaging::HICON;
-#[cfg(windows)]
-use windows_sys::Win32::Graphics::Gdi::{
-    BITMAPV5HEADER, CreateDIBSection, DeleteObject, GetDC, ReleaseDC, RGBQUAD,
-};
-#[cfg(windows)]
-use windows_sys::Win32::System::Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GHND};
-#[cfg(windows)]
-use windows_sys::Win32::UI::WindowsAndMessaging::{CreateIconIndirect, ICONINFO};
-
-#[cfg(windows)]
-pub fn load_icon_from_png(file_path: &str) -> HICON {
-    // Load the image
-    let img = ImageReader::open(file_path).unwrap().decode().unwrap();
-    let (width, height) = img.dimensions();
-    let rgba = img.to_rgba8();
-    let raw_data = rgba.into_raw();
-
-    unsafe {
-        // Create a BITMAPV5HEADER
-        let mut bi = BITMAPV5HEADER {
-            bV5Size: std::mem::size_of::<BITMAPV5HEADER>() as u32,
-            bV5Width: width as i32,
-            bV5Height: -(height as i32), // Negative for top-down DIB
-            bV5Planes: 1,
-            bV5BitCount: 32,
-            bV5Compression: 3, // BI_BITFIELDS
-            bV5SizeImage: (width * height * 4) as u32,
-            bV5RedMask: 0x00FF0000,
-            bV5GreenMask: 0x0000FF00,
-            bV5BlueMask: 0x000000FF,
-            bV5AlphaMask: 0xFF000000,
-            ..std::mem::zeroed()
-        };
-
-        // Get device context
-        let hdc = GetDC(std::ptr::null_mut());
-
-
-        // Create DIB section
-        let mut bits: *mut c_void = ptr::null_mut();  // `bits` will hold the pointer to pixel data
-        let hbitmap = CreateDIBSection(
-            hdc,
-            &bi as *const _ as *const _,
-            0,
-            &mut bits as *mut _ as *mut *mut c_void, // Correctly pass a mutable pointer to bits
-            ptr::null_mut(),
-            0
-        );
-        ReleaseDC(std::ptr::null_mut(), hdc);
-
-        if hbitmap.is_null() {
-            return std::ptr::null_mut();
-        }
-
-        // Copy image data to the HBITMAP memory
-        ptr::copy_nonoverlapping(raw_data.as_ptr(), bits as *mut u8, raw_data.len());
-
-        // Create an empty mask bitmap
-        let mut mask_bits: *mut c_void = ptr::null_mut();  // Create a mutable pointer for mask bits
-        let hmask = CreateDIBSection(
-            hdc,
-            &bi as *const _ as *const _,
-            0,
-            &mut mask_bits as *mut _ as *mut *mut c_void, // Correctly pass a mutable pointer to mask_bits
-            ptr::null_mut(),
-            0
-        );
-        if hmask.is_null() {
-            DeleteObject(hbitmap as _);
-            return std::ptr::null_mut();
-        }
-
-        // Create an ICONINFO structure
-        let icon_info = ICONINFO {
-            fIcon: 1, // 1 = Icon, 0 = Cursor
-            xHotspot: 0,
-            yHotspot: 0,
-            hbmMask: hmask,
-            hbmColor: hbitmap,
-        };
-
-        // Create icon
-        let hicon = CreateIconIndirect(&icon_info);
-
-        // Clean up bitmaps
-        DeleteObject(hbitmap as _);
-        DeleteObject(hmask as _);
-
-        hicon
-    }
-}
-
