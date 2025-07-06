@@ -41,7 +41,7 @@ pub fn watchdog() -> Result<(), Box<dyn std::error::Error + Send>> {
                 // optionally alert user or recover
             }
 
-            match check_for_updates() {
+            match check_for_updates("".to_string()) {
                 Ok(_) => log::info!("Check for updates complete!"),
                 Err(e) => log::error!("Error checking for updates: {:?}\n", e),
             }

@@ -215,15 +215,23 @@ pub fn run_windows_cmd(cmd_input: &str) -> Result<(), Box<dyn std::error::Error>
     Ok(())
 }
 
-pub fn check_for_updates() -> Result<(), Box<dyn Error>> {
+pub fn check_for_updates(arg: String) -> Result<(), Box<dyn Error>> {
     log::info!("Checking for updates...");
     
     #[cfg(unix)]
     {
-        Command::new(GAMEMON_UPDATER.as_path())
-            .spawn()
-            .map(|_| ()) // Convert `Result<Child, io::Error>` to `Result<(), io::Error>`
-            .map_err(|e| Box::new(e) as Box<dyn Error>) // Convert to `Box<dyn Error>`
+        if arg == "tray"{
+            Command::new(GAMEMON_UPDATER.as_path())
+                .arg("--tray")
+                .spawn()
+                .map(|_| ()) // Convert `Result<Child, io::Error>` to `Result<(), io::Error>`
+                .map_err(|e| Box::new(e) as Box<dyn Error>) // Convert to `Box<dyn Error>`
+        } else {
+            Command::new(GAMEMON_UPDATER.as_path())
+                .spawn()
+                .map(|_| ()) // Convert `Result<Child, io::Error>` to `Result<(), io::Error>`
+                .map_err(|e| Box::new(e) as Box<dyn Error>) // Convert to `Box<dyn Error>`
+        }
     }
 
     #[cfg(windows)]

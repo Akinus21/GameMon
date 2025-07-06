@@ -30,6 +30,8 @@ use std::os::windows::process::CommandExt;
 #[cfg(windows)]
 use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
 
+
+
 pub fn main() {
     logger::Logger::init().expect("Failed to initialize logger");
     log::info!("MAIN FUNCTION ENTRY: Starting GameMon...");
@@ -144,7 +146,7 @@ pub fn main() {
                 }
                 "updates" => {
                     log::info!("Received Check for Updates message from tray.");
-                    match check_for_updates() {
+                    match check_for_updates("tray".to_string()) {
                         Ok(_) => log::info!("Check for updates complete!"),
                         Err(e) => log::error!("Error checking for updates: {:?}", e),
                     }

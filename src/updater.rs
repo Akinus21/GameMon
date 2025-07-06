@@ -11,6 +11,15 @@ use serde::Deserialize;
 use reqwest::header::{ACCEPT, USER_AGENT};
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
+use clap::Parser;
+
+#[derive(Parser, Debug)]
+#[command(name = "GameMon")]
+#[command(about = "Monitors games and handles events", long_about = None)]
+struct Args {
+    #[arg(short, long)]
+    tray: bool,
+}
 
 // GitHub release asset and release structs
 #[derive(Deserialize)]
@@ -28,6 +37,8 @@ struct GithubReleaseFull {
 #[tokio::main]
 async fn main() {
     logger::Logger::init_with_target("GameMon-service").expect("Failed to initialize logger");
+
+    let args = Args::parse();
 
     check_update_marker();
 
@@ -144,6 +155,14 @@ async fn main() {
         }
     } else {
         log::info!("✅ Already up to date.");
+        if args.tray {
+            MessageDialog::new()
+                .set_level(MessageLevel::Info)
+                .set_title("GameMon Updater")
+                .set_description("You are already running the latest version of GameMon.")
+                .set_buttons(MessageButtons::Ok)
+                .show();
+        }
     }
 }
 
