@@ -20,7 +20,6 @@ use std::sync::Arc;
 use signal_hook::consts::signal::*;
 use signal_hook::iterator::Signals;
 use gtk::glib;
-use notify::{RecommendedWatcher, RecursiveMode, Watcher, EventKind};
 
 #[cfg(windows)]
 use GameMon::config;
@@ -214,3 +213,4 @@ pub fn show_gui() {
         }
     }
 }
+
