@@ -53,3 +53,8 @@ The resulting executable will be found in the target/release directory.
     - Window Active
 - Add Custom Delay for individual checks
 - Clean up code
+- Add flag system to indicate necessary action
+   - Needs update
+   - Installed
+   - Just updated (true after update, spawns actions on first start after update, then set to false)
+- Add priority system to prevent conflicting overlapping runs (ie: Don't run X profile actions, if Y profile is active)
