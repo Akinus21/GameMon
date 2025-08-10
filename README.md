@@ -43,13 +43,13 @@ GameMon is written in Rust. To build from source, you'll need to have a Rust dev
 The resulting executable will be found in the target/release directory.
 
 ## ToDo
-|__ Add other conditions to match on, including
-    |__ Startup
-    |__ Login
-    |__ Shutdown
-    |__ Sleep or suspend
-    |__ Script or program returns as "true"
-    |__ Hotkey pressed
-    |__ Window Active
-|__ Add Custom Delay for individual checks
-|__ Clean up code
+- Add other conditions to match on, including
+    - Startup
+    - Login
+    - Shutdown
+    - Sleep or suspend
+    - Script or program returns as "true"
+    - Hotkey pressed
+    - Window Active
+- Add Custom Delay for individual checks
+- Clean up code
