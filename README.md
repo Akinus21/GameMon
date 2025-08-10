@@ -41,3 +41,15 @@ GameMon is written in Rust. To build from source, you'll need to have a Rust dev
    ```bash
    cargo build --release
 The resulting executable will be found in the target/release directory.
+
+## ToDo
+|__ Add other conditions to match on, including
+    |__ Startup
+    |__ Login
+    |__ Shutdown
+    |__ Sleep or suspend
+    |__ Script or program returns as "true"
+    |__ Hotkey pressed
+    |__ Window Active
+|__ Add Custom Delay for individual checks
+|__ Clean up code
