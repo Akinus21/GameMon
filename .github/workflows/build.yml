@@ -1,0 +1,207 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  HOMEBREW_TAP_ENABLED: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Rust
+        uses: actions/setup-rust@v2
+        with:
+          rust-version: stable
+
+      - name: Build release binary
+        id: build
+        run: |
+          set -o pipefail
+          BUILD_CMD="cargo build --release"
+          $BUILD_CMD 2>&1 | tee build.log
+        shell: bash
+
+      - name: Verify binary
+        id: verify
+        run: |
+          BINARY="target/release/gamemon"
+          if [ ! -f "$BINARY" ]; then
+            echo "Binary not found!"
+            exit 1
+          fi
+          SIZE=$(stat -c%s "$BINARY")
+          if [ "$SIZE" -lt 102400 ]; then
+            echo "Binary size $SIZE is too small."
+            exit 1
+          fi
+          echo "Binary size $SIZE OK"
+        shell: bash
+
+      - name: Upload build log artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+          if-no-files-found: error
+
+      - name: Determine next tag
+        id: tag
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git fetch --tags
+          LATEST_TAG=$(git describe --tags --abbrev=0 || echo "v0.0.0")
+          echo "Latest tag: $LATEST_TAG"
+          VERSION=${LATEST_TAG#v}
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          PATCH=$((PATCH + 1))
+          NEW_TAG="v${MAJOR}.${MINOR}.${PATCH}"
+          echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
+          echo "New tag will be $NEW_TAG"
+        shell: bash
+
+      - name: Update Cargo.toml version
+        if: steps.tag.outputs.new_tag != ''
+        run: |
+          NEW_VERSION=${steps.tag.outputs.new_tag#v}
+          sed -i -E "s/^version = \".*\"$/version = \"${NEW_VERSION}\"/" Cargo.toml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.toml
+          git commit -m "chore: bump version to ${NEW_VERSION}"
+        shell: bash
+
+      - name: Push version bump
+        if: steps.tag.outputs.new_tag != ''
+        run: |
+          git push origin HEAD:${{ github.ref }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Git tag
+        if: steps.tag.outputs.new_tag != ''
+        run: |
+          git tag ${{ steps.tag.outputs.new_tag }}
+          git push origin ${{ steps.tag.outputs.new_tag }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release
+        if: steps.tag.outputs.new_tag != ''
+        id: release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BINARY="target/release/gamemon"
+          SHA256=$(sha256sum "$BINARY" | awk '{print $1}')
+          echo "sha256=$SHA256" >> $GITHUB_OUTPUT
+          gh release create ${{ steps.tag.outputs.new_tag }} "$BINARY" \
+            --title "Release ${{ steps.tag.outputs.new_tag }}" \
+            --notes "Automated release of gamemon ${{ steps.tag.outputs.new_tag }}"
+        shell: bash
+
+      - name: Homebrew tap update
+        if: steps.tag.outputs.new_tag != '' && env.HOMEBREW_TAP_ENABLED == 'true'
+        env:
+          TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
+          NEW_TAG: ${{ steps.tag.outputs.new_tag }}
+          SHA256: ${{ steps.release.outputs.sha256 }}
+        run: |
+          set -e
+          REPO="Akinus21/homebrew-tap"
+          TMPDIR=$(mktemp -d)
+          git clone https://x-access-token:${TAP_TOKEN}@github.com/${REPO}.git $TMPDIR
+          cd $TMPDIR
+          FORMULA_PATH="Formula/gamemon.rb"
+          cat > $FORMULA_PATH <<EOF
+          class Gamemon < Formula
+            desc "GameMon utility"
+            homepage "https://github.com/Akinus21/GameMon"
+            url "https://github.com/Akinus21/GameMon/releases/download/${NEW_TAG}/gamemon"
+            sha256 "${SHA256}"
+            license "MIT"
+            def install
+              bin.install "gamemon"
+            end
+          end
+          EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add $FORMULA_PATH
+          git commit -m "gamemon ${NEW_TAG}"
+          git push origin main
+        shell: bash
+
+      - name: Notify success webhook
+        if: always()
+        env:
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_HMAC_SECRET }}
+          PAYLOAD: |
+            {
+              "event": "build_success",
+              "run_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+              "sha": "${{ github.sha }}",
+              "commit_msg": "${{ github.event.head_commit.message }}",
+              "ref": "${{ github.ref_name }}",
+              "actor": "${{ github.actor }}"
+            }
+        run: |
+          PAYLOAD=$(echo "$PAYLOAD" | tr -d '\n')
+          SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" | awk '{print "sha256="$2}')
+          curl -X POST https://webhook.akinus21.com/webhook/gamemon-build \
+            -H "Content-Type: application/json" \
+            -H "X-Hub-Signature-256: $SIGNATURE" \
+            -H "X-GitHub-Event: build_success" \
+            -d "$PAYLOAD"
+        shell: bash
+
+  notify_failure:
+    if: failure()
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download build log
+        uses: actions/download-artifact@v4
+        with:
+          name: build-log
+          path: .
+
+      - name: Notify failure webhook
+        env:
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_HMAC_SECRET }}
+          PAYLOAD: |
+            {
+              "run_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+              "sha": "${{ github.sha }}",
+              "commit_msg": "${{ github.event.head_commit.message }}",
+              "ref": "${{ github.ref_name }}",
+              "actor": "${{ github.actor }}",
+              "errors": "$(tail -n 200 build.log | python -c 'import json,sys; print(json.dumps(sys.stdin.read()))')"
+            }
+        run: |
+          PAYLOAD=$(echo "$PAYLOAD" | tr -d '\n')
+          SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" | awk '{print "sha256="$2}')
+          curl -X POST https://webhook.akinus21.com/webhook/gamemon-build \
+            -H "Content-Type: application/json" \
+            -H "X-Hub-Signature-256: $SIGNATURE" \
+            -H "X-GitHub-Event: build_failure" \
+            -d "$PAYLOAD"
+        shell: bash
