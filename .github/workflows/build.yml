@@ -23,9 +23,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Rust
-        uses: actions/setup-rust@v2
-        with:
-          rust-version: stable
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Build release binary
         id: build
