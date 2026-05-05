@@ -41,7 +41,7 @@ jobs:
       - name: Verify binary
         id: verify
         run: |
-          BINARY="target/release/gamemon"
+          BINARY="target/release/GameMon-service"
           if [ ! -f "$BINARY" ]; then
             echo "Binary not found!"
             exit 1
@@ -108,12 +108,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
-          BINARY="target/release/gamemon"
+          BINARY="target/release/GameMon-service"
           SHA256=$(sha256sum "$BINARY" | awk '{print $1}')
           echo "sha256=$SHA256" >> $GITHUB_OUTPUT
           gh release create ${{ steps.tag.outputs.new_tag }} "$BINARY" \
             --title "Release ${{ steps.tag.outputs.new_tag }}" \
-            --notes "Automated release of gamemon ${{ steps.tag.outputs.new_tag }}"
+            --notes "Automated release of GameMon-service ${{ steps.tag.outputs.new_tag }}"
         shell: bash
 
       - name: Homebrew tap update
@@ -131,13 +131,13 @@ jobs:
           FORMULA_PATH="Formula/gamemon.rb"
           cat > $FORMULA_PATH <<EOF
           class Gamemon < Formula
-            desc "GameMon utility"
+            desc "GameMon service daemon"
             homepage "https://github.com/Akinus21/GameMon"
-            url "https://github.com/Akinus21/GameMon/releases/download/${NEW_TAG}/gamemon"
+            url "https://github.com/Akinus21/GameMon/releases/download/${NEW_TAG}/GameMon-service"
             sha256 "${SHA256}"
             license "MIT"
             def install
-              bin.install "gamemon"
+              bin.install "GameMon-service"
             end
           end
           EOF
