@@ -89,7 +89,7 @@ jobs:
         run: |
           git push origin HEAD:${{ github.ref }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Create Git tag
         if: steps.tag.outputs.new_tag != ''
@@ -97,13 +97,13 @@ jobs:
           git tag ${{ steps.tag.outputs.new_tag }}
           git push origin ${{ steps.tag.outputs.new_tag }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Create GitHub Release
         if: steps.tag.outputs.new_tag != ''
         id: release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           BINARY="target/release/gamemon"
           SHA256=$(sha256sum "$BINARY" | awk '{print $1}')
@@ -116,7 +116,7 @@ jobs:
       - name: Homebrew tap update
         if: steps.tag.outputs.new_tag != '' && env.HOMEBREW_TAP_ENABLED == 'true'
         env:
-          TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
+          TAP_TOKEN: ${{ secrets.GH_TOKEN }}
           NEW_TAG: ${{ steps.tag.outputs.new_tag }}
           SHA256: ${{ steps.release.outputs.sha256 }}
         run: |
@@ -148,7 +148,8 @@ jobs:
       - name: Notify success webhook
         if: always()
         env:
-          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_HMAC_SECRET }}
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+          WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
           PAYLOAD: |
             {
               "event": "build_success",
@@ -161,7 +162,7 @@ jobs:
         run: |
           PAYLOAD=$(echo "$PAYLOAD" | tr -d '\n')
           SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" | awk '{print "sha256="$2}')
-          curl -X POST https://webhook.akinus21.com/webhook/gamemon-build \
+          curl -X POST $WEBHOOK_URL \
             -H "Content-Type: application/json" \
             -H "X-Hub-Signature-256: $SIGNATURE" \
             -H "X-GitHub-Event: build_success" \
@@ -186,7 +187,8 @@ jobs:
 
       - name: Notify failure webhook
         env:
-          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_HMAC_SECRET }}
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+          WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
           PAYLOAD: |
             {
               "run_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
@@ -199,7 +201,7 @@ jobs:
         run: |
           PAYLOAD=$(echo "$PAYLOAD" | tr -d '\n')
           SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" | awk '{print "sha256="$2}')
-          curl -X POST https://webhook.akinus21.com/webhook/gamemon-build \
+          curl -X POST $WEBHOOK_URL \
             -H "Content-Type: application/json" \
             -H "X-Hub-Signature-256: $SIGNATURE" \
             -H "X-GitHub-Event: build_failure" \
