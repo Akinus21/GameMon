@@ -46,6 +46,14 @@ pub fn spawn_tray(
     // Define the path to monitor for changes
     let config_path = GAMEMON_CONFIG_FILE.clone();
 
+    // Ensure config file exists before watching
+    if !config_path.exists() {
+        if let Some(parent) = config_path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let _ = std::fs::File::create(&config_path);
+    }
+
     // Spawn a background thread to watch for file system changes
     std::thread::spawn(move || {
         let (tx, rx) = std::sync::mpsc::channel();
