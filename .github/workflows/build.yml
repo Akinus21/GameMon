@@ -79,7 +79,8 @@ jobs:
       - name: Update Cargo.toml version
         if: steps.tag.outputs.new_tag != ''
         run: |
-          NEW_VERSION=${steps.tag.outputs.new_tag#v}
+          NEW_VERSION="${{ steps.tag.outputs.new_tag }}"
+          NEW_VERSION="${NEW_VERSION#v}"
           sed -i -E "s/^version = \".*\"$/version = \"${NEW_VERSION}\"/" Cargo.toml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
