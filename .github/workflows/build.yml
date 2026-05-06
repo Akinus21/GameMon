@@ -137,8 +137,13 @@ jobs:
             url "https://github.com/Akinus21/GameMon/releases/download/${NEW_TAG}/GameMon-service"
             sha256 "${SHA256}"
             license "MIT"
+
             def install
               bin.install "GameMon-service"
+            end
+
+            def post_install
+              system "#{bin}/GameMon-service", "--install-resources"
             end
           end
           EOF

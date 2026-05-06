@@ -1,6 +1,6 @@
 use std::process::{exit, Command};
 use std::sync::mpsc;
-use std::{env, fs, thread};
+use std::{env, fs, thread, path::Path};
 use std::time::Duration;
 use game_mon::config::{check_for_updates,
     Config,
@@ -20,6 +20,15 @@ use std::sync::Arc;
 use signal_hook::consts::signal::*;
 use signal_hook::iterator::Signals;
 use gtk::glib;
+use clap::Parser;
+
+#[derive(Parser, Debug)]
+#[command(name = "GameMon-service")]
+#[command(about = "GameMon service daemon", long_about = None)]
+struct Args {
+    #[arg(long)]
+    install_resources: bool,
+}
 
 #[cfg(windows)]
 use GameMon::config;
@@ -33,6 +42,13 @@ use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
 
 
 pub fn main() {
+    let args = Args::parse();
+
+    if args.install_resources {
+        install_resources();
+        return;
+    }
+
     logger::Logger::init().expect("Failed to initialize logger");
     log::info!("MAIN FUNCTION ENTRY: Starting GameMon...");
 
@@ -184,6 +200,62 @@ pub fn main() {
     }
 
     log::info!("Main function exiting.");
+}
+
+fn install_resources() {
+    use std::path::PathBuf;
+    
+    log::info!("Installing resources...");
+    
+    let gamemon_dir = &*GAMEMON_DIR;
+    let resource_dir = &*GAMEMON_RESOURCE_DIR;
+    let bin_dir = &*GAMEMON_BIN_DIR;
+    
+    let _ = fs::create_dir_all(gamemon_dir);
+    let _ = fs::create_dir_all(resource_dir);
+    let _ = fs::create_dir_all(bin_dir);
+    
+    let exe_path = env::current_exe().expect("Failed to get current executable path");
+    let exe_dir = exe_path.parent().expect("Executable has no parent directory");
+    
+    let binaries = ["GameMon-gui", "GameMon-update"];
+    for bin in &binaries {
+        let src = exe_dir.join(bin);
+        let dst = gamemon_dir.join(bin);
+        if src.exists() {
+            let _ = fs::copy(&src, &dst);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let _ = fs::set_permissions(&dst, fs::Permissions::from_mode(0o755));
+            }
+            log::info!("Installed {} to {:?}", bin, dst);
+        }
+    }
+    
+    let resources_src = exe_dir.join("resources");
+    if resources_src.exists() {
+        copy_dir_all(&resources_src, resource_dir);
+        log::info!("Installed resources to {:?}", resource_dir);
+    }
+    
+    log::info!("Resource installation complete.");
+}
+
+fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
+    fs::create_dir_all(dst)?;
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+        if ty.is_dir() {
+            copy_dir_all(&src_path, &dst_path)?;
+        } else {
+            fs::copy(&src_path, &dst_path)?;
+        }
+    }
+    Ok(())
 }
 
 pub fn show_gui() {
