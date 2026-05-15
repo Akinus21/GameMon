@@ -21,6 +21,47 @@ use iced::Color;
 use crate::config;
 use crate::config::{GAMEMON_CONFIG_FILE, ensure_paths_exist};
 
+fn get_system_palette() -> Palette {
+    let is_dark = detect_gtk_dark_mode();
+    
+    if is_dark {
+        Palette {
+            background: Color::from_rgb8(0x1E, 0x1E, 0x1E),
+            text: Color::from_rgb8(0xE0, 0xE0, 0xE0),
+            primary: Color::from_rgb8(0x6C, 0xAF, 0xE8),
+            success: Color::from_rgb8(0x4A, 0xD4, 0x8C),
+            danger: Color::from_rgb8(0xE5, 0x4A, 0x4A),
+        }
+    } else {
+        Palette {
+            background: Color::from_rgb8(0xFC, 0xFC, 0xFC),
+            text: Color::from_rgb8(0x2E, 0x2E, 0x2E),
+            primary: Color::from_rgb8(0x1A, 0x73, 0xE8),
+            success: Color::from_rgb8(0x13, 0xB8, 0x65),
+            danger: Color::from_rgb8(0xD9, 0x34, 0x25),
+        }
+    }
+}
+
+fn detect_gtk_dark_mode() -> bool {
+    std::process::Command::new("gsettings")
+        .args(["get", "org.gnome.desktop.interface", "color-scheme"])
+        .output()
+        .ok()
+        .map(|o| String::from_utf8_lossy(&o.stdout).contains("dark"))
+        .unwrap_or_else(|| {
+            std::process::Command::new("gsettings")
+                .args(["get", "org.gnome.desktop.interface", "gtk-theme"])
+                .output()
+                .ok()
+                .map(|o| {
+                    let theme = String::from_utf8_lossy(&o.stdout).to_lowercase();
+                    theme.contains("dark") || theme.contains("darker")
+                })
+                .unwrap_or(false)
+        })
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ThemeType {
     System,
@@ -105,14 +146,7 @@ impl Gui {
             ThemeType::Dark => iced::Theme::Dark,
             ThemeType::Light => iced::Theme::Light,
             ThemeType::System => {
-                let purple_haze_palette = Palette {
-                    background: Color::from_rgb8(0x19, 0x08, 0x2F),
-                    text: Color::from_rgb8(0xE7, 0xE7, 0xE7),
-                    primary: Color::from_rgb8(0x92, 0xCF, 0x9C),
-                    success: Color::from_rgb8(168, 80, 250),
-                    danger: Color::from_rgb8(0xFF, 0x55, 0x55),
-                };
-                iced::Theme::custom("Purple_Haze".to_string(), purple_haze_palette)
+                iced::Theme::custom("System".to_string(), get_system_palette())
             }
         }
     }
