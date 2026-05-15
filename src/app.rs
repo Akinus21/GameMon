@@ -102,8 +102,8 @@ pub enum Message {
 impl Gui {
     pub fn theme(&self) -> Theme {
         match self.selected_theme {
-            ThemeType::Dark => iced::Theme::dark(),
-            ThemeType::Light => iced::Theme::light(),
+            ThemeType::Dark => iced::Theme::Dark,
+            ThemeType::Light => iced::Theme::Light,
             ThemeType::System => {
                 let purple_haze_palette = Palette {
                     background: Color::from_rgb8(0x19, 0x08, 0x2F),
