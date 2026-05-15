@@ -188,28 +188,13 @@ jobs:
             -d "$PAYLOAD"
         shell: bash
 
-  notify_failure:
-    if: failure()
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Download build log
-        uses: actions/download-artifact@v4
-        with:
-          name: build-log
-          path: .
-
       - name: Notify failure webhook
+        if: failure()
         env:
           WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
           WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
         run: |
-          ERRORS=$(tail -n 200 build.log | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
+          ERRORS=$(tail -n 200 build.log 2>/dev/null | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))' || echo '""')
           PAYLOAD=$(cat <<EOF
           {
             "event": "build_failure",
