@@ -109,12 +109,18 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
-          BINARY="target/release/GameMon-service"
-          SHA256=$(sha256sum "$BINARY" | awk '{print $1}')
+          set -e
+          cd target/release
+          mkdir -p GameMon
+          cp GameMon-service GameMon-gui GameMon-update GameMon/
+          cp -r resources GameMon/ 2>/dev/null || true
+          chmod +x GameMon/*
+          tar -czvf GameMon.tar.gz GameMon
+          SHA256=$(sha256sum GameMon.tar.gz | awk '{print $1}')
           echo "sha256=$SHA256" >> $GITHUB_OUTPUT
-          gh release create ${{ steps.tag.outputs.new_tag }} "$BINARY" \
+          gh release create ${{ steps.tag.outputs.new_tag }} GameMon.tar.gz \
             --title "Release ${{ steps.tag.outputs.new_tag }}" \
-            --notes "Automated release of GameMon-service ${{ steps.tag.outputs.new_tag }}"
+            --notes "Automated release of GameMon ${{ steps.tag.outputs.new_tag }}"
         shell: bash
 
       - name: Homebrew tap update
@@ -134,16 +140,19 @@ jobs:
           class Gamemon < Formula
             desc "GameMon service daemon"
             homepage "https://github.com/Akinus21/GameMon"
-            url "https://github.com/Akinus21/GameMon/releases/download/${NEW_TAG}/GameMon-service"
+            url "https://github.com/Akinus21/GameMon/releases/download/${NEW_TAG}/GameMon.tar.gz"
             sha256 "${SHA256}"
             license "MIT"
 
             def install
-              bin.install "GameMon-service"
+              prefix.install Dir["GameMon/*"]
+              bin.install_symlink "#{prefix}/GameMon/GameMon-service" => "gamemon-service"
+              bin.install_symlink "#{prefix}/GameMon/GameMon-gui" => "gamemon-gui"
+              bin.install_symlink "#{prefix}/GameMon/GameMon-update" => "gamemon-update"
             end
 
             def post_install
-              system "#{bin}/GameMon-service", "--install-resources"
+              system "#{prefix}/GameMon/GameMon-service", "--install-resources"
             end
           end
           EOF
