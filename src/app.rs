@@ -12,7 +12,6 @@ use iced::widget::{
     vertical_space,
     horizontal_space,
     scrollable,
-    List as IcedList,
 };
 use iced::Length::Fill;
 use iced::Theme;
@@ -287,11 +286,9 @@ impl Gui {
                 .align_x(xCenter)
                 .into()
         } else {
-            column![
-                IcedList::with_children(profile_list)
-                    .spacing(4)
-            ]
-            .into()
+            column![]
+                .padding(5)
+                .into()
         };
 
         let settings_btn = button(text("⚙ Settings").size(12))
