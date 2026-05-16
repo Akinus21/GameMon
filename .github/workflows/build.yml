@@ -156,7 +156,6 @@ jobs:
             service do
               run [opt_bin/"gamemon-service"]
               keep_alive true
-              restart :on_fail
               log_path var/"log/gamemon.log"
               error_log_path var/"log/gamemon.log"
             end
