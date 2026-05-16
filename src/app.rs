@@ -270,7 +270,7 @@ impl Gui {
     }
 
     fn left_panel(&self) -> iced::widget::container::Container<'_, Message> {
-        let profile_list: Vec<_> = self.game_names.iter()
+        let profile_list: Vec<iced::Element<'_, Message>> = self.game_names.iter()
             .map(|name| {
                 let is_selected = self.selected_game_name.as_deref() == Some(name);
                 let label = if is_selected { format!("▶ {}", name) } else { name.clone() };
@@ -278,17 +278,20 @@ impl Gui {
                     .width(Fill)
                     .padding(8)
                     .on_press(Message::GameSelected(name.clone()))
+                    .into()
             })
             .collect();
 
-        let list_container = if profile_list.is_empty() {
+        let list_content: iced::Element<'_, Message> = if profile_list.is_empty() {
             column![text("No profiles yet").size(12).color([0.5, 0.5, 0.5])]
                 .align_x(xCenter)
                 .into()
         } else {
-            column![]
-                .padding(5)
-                .into()
+            column![
+                iced::widget::Column::with_children(profile_list)
+                    .spacing(4)
+            ]
+            .into()
         };
 
         let settings_btn = button(text("⚙ Settings").size(12))
@@ -299,7 +302,7 @@ impl Gui {
             column![
                 text("Profiles").size(16).align_x(xCenter),
                 vertical_space().height(10),
-                scrollable(list_container).height(Fill),
+                list_content,
                 vertical_space().height(10),
                 settings_btn
             ]
