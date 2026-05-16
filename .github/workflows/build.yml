@@ -147,10 +147,10 @@ jobs:
             license "MIT"
 
             def install
-              bin.install "GameMon/GameMon-service" => "gamemon-service"
-              bin.install "GameMon/GameMon-gui"     => "gamemon-gui"
-              bin.install "GameMon/GameMon-update"  => "gamemon-update"
-              (share/"gamemon").install "GameMon/resources"
+              bin.install "GameMon-service" => "gamemon-service"
+              bin.install "GameMon-gui"     => "gamemon-gui"
+              bin.install "GameMon-update"  => "gamemon-update"
+              (share/"gamemon").install "resources"
             end
 
             def post_install
