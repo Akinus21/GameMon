@@ -138,26 +138,24 @@ jobs:
           git clone https://x-access-token:${TAP_TOKEN}@github.com/${REPO}.git $TMPDIR
           cd $TMPDIR
           FORMULA_PATH="Formula/gamemon.rb"
-          cat > $FORMULA_PATH <<'BREW'
+          cat > $FORMULA_PATH <<BREW
           class Gamemon < Formula
             desc "GameMon service daemon"
             homepage "https://github.com/Akinus21/GameMon"
-            url "https://github.com/Akinus21/GameMon/releases/download/#{NEW_TAG}/GameMon.tar.gz"
-            sha256 "#{SHA256}"
+            url "https://github.com/Akinus21/GameMon/releases/download/${NEW_TAG}/GameMon.tar.gz"
+            sha256 "${SHA256}"
             license "MIT"
 
             def install
-              bin.install "GameMon-service" => "gamemon-service"
-              bin.install "GameMon-gui"     => "gamemon-gui"
-              bin.install "GameMon-update"  => "gamemon-update"
-              (share/"gamemon").install "resources"
+              bin.install "GameMon/GameMon-service" => "gamemon-service"
+              bin.install "GameMon/GameMon-gui"     => "gamemon-gui"
+              bin.install "GameMon/GameMon-update"  => "gamemon-update"
+              (share/"gamemon").install "GameMon/resources"
             end
 
             def post_install
-              # Symlink resources so GUI can find them at runtime
               system "#{bin}/gamemon-service", "--install-resources"
 
-              # Desktop entry
               desktop_dir = "#{ENV["HOME"]}/.local/share/applications"
               mkdir_p desktop_dir
               icon_path = "#{share}/gamemon/resources/gamemon.png"
@@ -173,7 +171,6 @@ jobs:
               DESKTOP
               system "update-desktop-database", desktop_dir if which("update-desktop-database")
 
-              # Systemd user service
               if which("systemctl")
                 service_dir = "#{ENV["HOME"]}/.config/systemd/user"
                 mkdir_p service_dir
