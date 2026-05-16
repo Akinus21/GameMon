@@ -153,43 +153,18 @@ jobs:
               (share/"gamemon").install "resources"
             end
 
+            service do
+              run [opt_bin/"gamemon-service"]
+              keep_alive true
+              restart :on_fail
+              log_path var/"log/gamemon.log"
+              error_log_path var/"log/gamemon.log"
+            end
+
             def post_install
-              system "#{bin}/gamemon-service", "--install-resources"
-
-              desktop_dir = "#{ENV["HOME"]}/.local/share/applications"
-              mkdir_p desktop_dir
-              icon_path = "#{share}/gamemon/resources/gamemon.png"
-              File.write("#{desktop_dir}/gamemon.desktop", <<~DESKTOP)
-                [Desktop Entry]
-                Name=GameMon
-                Comment=Automated Gaming Companion
-                Exec=gamemon-gui
-                Icon=#{icon_path}
-                Type=Application
-                Categories=Game;Utility;
-                Terminal=false
-              DESKTOP
-              system "update-desktop-database", desktop_dir if which("update-desktop-database")
-
-              if which("systemctl")
-                service_dir = "#{ENV["HOME"]}/.config/systemd/user"
-                mkdir_p service_dir
-                File.write("#{service_dir}/gamemon.service", <<~SERVICE)
-                  [Unit]
-                  Description=GameMon Gaming Monitor Service
-                  After=graphical-session.target
-
-                  [Service]
-                  ExecStart=%h/.linuxbrew/bin/gamemon-service
-                  Restart=on-failure
-                  RestartSec=5
-
-                  [Install]
-                  WantedBy=default.target
-                SERVICE
-                system "systemctl", "--user", "daemon-reload"
-                system "systemctl", "--user", "enable", "--now", "gamemon"
-              end
+              (var/"gamemon").mkpath
+              (var/"log").mkpath
+              system bin/"gamemon-service", "--install-resources"
             end
           end
           BREW
