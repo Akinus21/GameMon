@@ -110,11 +110,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           set -e
+          mkdir -p target/release/GameMon
+          cp target/release/GameMon-service target/release/GameMon/
+          cp target/release/GameMon-gui target/release/GameMon/
+          cp target/release/GameMon-update target/release/GameMon/
+          cp -r resources target/release/GameMon/
+          chmod +x target/release/GameMon/*
           cd target/release
-          mkdir -p GameMon
-          cp GameMon-service GameMon-gui GameMon-update GameMon/
-          cp -r resources GameMon/ 2>/dev/null || true
-          chmod +x GameMon/*
           tar -czvf GameMon.tar.gz GameMon
           SHA256=$(sha256sum GameMon.tar.gz | awk '{print $1}')
           echo "sha256=$SHA256" >> $GITHUB_OUTPUT
@@ -136,40 +138,42 @@ jobs:
           git clone https://x-access-token:${TAP_TOKEN}@github.com/${REPO}.git $TMPDIR
           cd $TMPDIR
           FORMULA_PATH="Formula/gamemon.rb"
-          cat > $FORMULA_PATH <<EOF
+          cat > $FORMULA_PATH <<'BREW'
           class Gamemon < Formula
             desc "GameMon service daemon"
             homepage "https://github.com/Akinus21/GameMon"
-            url "https://github.com/Akinus21/GameMon/releases/download/${NEW_TAG}/GameMon.tar.gz"
-            sha256 "${SHA256}"
+            url "https://github.com/Akinus21/GameMon/releases/download/#{NEW_TAG}/GameMon.tar.gz"
+            sha256 "#{SHA256}"
             license "MIT"
 
             def install
-              prefix.install Dir["GameMon/*"]
-              bin.install_symlink "#{prefix}/GameMon/GameMon-service" => "gamemon-service"
-              bin.install_symlink "#{prefix}/GameMon/GameMon-gui" => "gamemon-gui"
-              bin.install_symlink "#{prefix}/GameMon/GameMon-update" => "gamemon-update"
+              bin.install "GameMon-service" => "gamemon-service"
+              bin.install "GameMon-gui"     => "gamemon-gui"
+              bin.install "GameMon-update"  => "gamemon-update"
+              (share/"gamemon").install "resources"
             end
 
             def post_install
-              system "#{prefix}/GameMon/GameMon-service", "--install-resources"
+              # Symlink resources so GUI can find them at runtime
+              system "#{bin}/gamemon-service", "--install-resources"
 
-              # Install desktop entry
+              # Desktop entry
               desktop_dir = "#{ENV["HOME"]}/.local/share/applications"
               mkdir_p desktop_dir
+              icon_path = "#{share}/gamemon/resources/gamemon.png"
               File.write("#{desktop_dir}/gamemon.desktop", <<~DESKTOP)
                 [Desktop Entry]
                 Name=GameMon
                 Comment=Automated Gaming Companion
-                Exec=#{bin}/gamemon-gui
-                Icon=#{prefix}/GameMon/resources/gamemon.png
+                Exec=gamemon-gui
+                Icon=#{icon_path}
                 Type=Application
                 Categories=Game;Utility;
                 Terminal=false
               DESKTOP
               system "update-desktop-database", desktop_dir if which("update-desktop-database")
 
-              # Install systemd user service
+              # Systemd user service
               if which("systemctl")
                 service_dir = "#{ENV["HOME"]}/.config/systemd/user"
                 mkdir_p service_dir
@@ -179,7 +183,7 @@ jobs:
                   After=graphical-session.target
 
                   [Service]
-                  ExecStart=#{bin}/gamemon-service
+                  ExecStart=%h/.linuxbrew/bin/gamemon-service
                   Restart=on-failure
                   RestartSec=5
 
@@ -187,12 +191,11 @@ jobs:
                   WantedBy=default.target
                 SERVICE
                 system "systemctl", "--user", "daemon-reload"
-                system "systemctl", "--user", "enable", "gamemon"
-                system "systemctl", "--user", "start", "gamemon"
+                system "systemctl", "--user", "enable", "--now", "gamemon"
               end
             end
           end
-          EOF
+          BREW
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add $FORMULA_PATH
